@@ -95,6 +95,11 @@ export interface Preferences {
   accent: string;
   background: string;
   foreground: string;
+  glass: boolean;
+  glassBlur: number;
+  glassOpacity: number;
+  glassPopups: boolean;
+  waveform: boolean;
   gain: "off" | "track" | "album" | "auto";
   preamp: number;
   protect: boolean;
@@ -109,6 +114,11 @@ export const defaults: Preferences = {
   accent: "#e5534b",
   background: "",
   foreground: "",
+  glass: true,
+  glassBlur: 20,
+  glassOpacity: 80,
+  glassPopups: false,
+  waveform: false,
   gain: "off",
   preamp: 0,
   protect: true,

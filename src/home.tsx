@@ -6,6 +6,7 @@ import { useApp } from "./context";
 import type { TextKey } from "./i18n";
 import { splitMembers as splitTagMembers, type Track } from "./model";
 import { player } from "./player";
+import { ThemeToggle } from "./theme-toggle";
 
 export function HomePage() {
   const { lib, t, busy, error, reload } = useApp();
@@ -114,6 +115,7 @@ export function HomePage() {
           <ChevronRight size={14} aria-hidden="true" />
           <span aria-current="page">{t("home")}</span>
         </nav>
+        <ThemeToggle />
       </div>
       <div className="page-content home-page">
         {busy ? (

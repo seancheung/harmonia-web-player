@@ -24,7 +24,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { Motion, spring } from "react-motion";
 
 type OptionProps = {
   value?: string | number;
@@ -160,6 +159,7 @@ export function Select({
         id={controlId}
         ref={refs.setReference}
         className="select-control"
+        data-open={open}
         disabled={disabled}
         aria-label={label}
         aria-labelledby={label || controlId ? undefined : `${id}-value`}
@@ -178,19 +178,7 @@ export function Select({
               ))
             : (options[selected]?.label ?? "")}
         </span>
-        <Motion
-          style={{
-            angle: spring(open ? 180 : 0, { stiffness: 400, damping: 30 }),
-          }}
-        >
-          {({ angle }) => (
-            <ChevronDown
-              size={16}
-              aria-hidden="true"
-              style={{ transform: `rotate(${angle}deg)` }}
-            />
-          )}
-        </Motion>
+        <ChevronDown size={16} aria-hidden="true" />
       </button>
       {isMounted && (
         <FloatingPortal>

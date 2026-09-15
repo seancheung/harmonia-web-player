@@ -20,13 +20,7 @@ import {
   Type,
   X,
 } from "lucide-react";
-import {
-  type CSSProperties,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Cover, IconButton, Modal } from "./components";
 import { useApp } from "./context";
 import { DialogPresence } from "./dialog-presence";
@@ -34,6 +28,7 @@ import type { TextKey } from "./i18n";
 import { api, duration, lyricsLines } from "./model";
 import { player } from "./player";
 import { QueueList } from "./queue-list";
+import { SeekControl } from "./seek-control";
 import { VolumeControl } from "./volume-control";
 
 export function PlayerBar() {
@@ -222,22 +217,7 @@ export function PlayerBar() {
           </div>
           <div className="progress-control">
             <span>{duration(s.position)}</span>
-            <input
-              aria-label={t("seek")}
-              aria-valuetext={`${duration(s.position)} / ${duration(track?.duration || 0)}`}
-              style={
-                {
-                  "--progress": `${track?.duration ? Math.max(0, Math.min(100, (s.position / track.duration) * 100)) : 0}%`,
-                } as CSSProperties
-              }
-              type="range"
-              disabled={!track}
-              min="0"
-              max={track?.duration || 1}
-              step="0.1"
-              value={Math.min(s.position, track?.duration || 1)}
-              onChange={(e) => player.seek(Number(e.target.value))}
-            />
+            <SeekControl track={track} position={s.position} />
             <span>{duration(track?.duration || 0)}</span>
           </div>
         </div>

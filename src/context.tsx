@@ -97,6 +97,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
           : prefs.theme;
       document.documentElement.lang = prefs.language === "zh" ? "zh-CN" : "en";
       document.documentElement.style.setProperty("--accent", prefs.accent);
+      const root = document.documentElement;
+      root.dataset.glass = prefs.glass ? "on" : "off";
+      root.dataset.glassPopups =
+        prefs.glass && prefs.glassPopups ? "on" : "off";
+      root.style.setProperty(
+        "--glass-blur",
+        `${Math.max(0, Math.min(40, prefs.glassBlur))}px`,
+      );
+      root.style.setProperty(
+        "--glass-opacity",
+        `${Math.max(60, Math.min(100, prefs.glassOpacity))}%`,
+      );
+      root.style.setProperty(
+        "--glass-popup-opacity",
+        `${Math.max(75, Math.min(100, prefs.glassOpacity + 10))}%`,
+      );
       for (const [key, value] of [
         ["--bg", prefs.background],
         ["--text", prefs.foreground],

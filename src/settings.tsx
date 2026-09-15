@@ -7,7 +7,7 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { IconButton, Modal } from "./components";
 import { useApp } from "./context";
 import { DialogPresence } from "./dialog-presence";
@@ -21,6 +21,7 @@ import {
   type Source,
 } from "./model";
 import { Select, SelectOption } from "./select";
+import { ThemeToggle } from "./theme-toggle";
 
 interface Capabilities {
   formats: string[];
@@ -119,6 +120,7 @@ export function SettingsPage() {
           <span aria-hidden="true">/</span>
           <span aria-current="page">{t("settings")}</span>
         </nav>
+        <ThemeToggle />
       </div>
       <div className="page-content settings-page">
         <header className="page-heading">
@@ -173,7 +175,7 @@ export function SettingsPage() {
                       type="color"
                       value={
                         prefs[key] ||
-                        (key === "background" ? "#f8f7f5" : "#232329")
+                        (key === "background" ? "#fafafa" : "#252529")
                       }
                       onChange={(e) => preference(key, e.target.value)}
                     />
@@ -182,6 +184,71 @@ export function SettingsPage() {
                 </label>
               ))}
             </div>
+            <div className="settings-grid glass-settings">
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={prefs.glass}
+                  onChange={(e) => preference("glass", e.target.checked)}
+                />
+                {t("glass")}
+              </label>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={prefs.glassPopups}
+                  disabled={!prefs.glass}
+                  onChange={(e) => preference("glassPopups", e.target.checked)}
+                />
+                {t("glassPopups")}
+              </label>
+              <label>
+                {t("glassBlur")} · {prefs.glassBlur}px
+                <input
+                  type="range"
+                  min="0"
+                  max="40"
+                  step="1"
+                  value={prefs.glassBlur}
+                  style={
+                    {
+                      "--progress": `${(prefs.glassBlur / 40) * 100}%`,
+                    } as CSSProperties
+                  }
+                  disabled={!prefs.glass}
+                  onChange={(e) =>
+                    preference("glassBlur", Number(e.target.value))
+                  }
+                />
+              </label>
+              <label>
+                {t("glassOpacity")} · {prefs.glassOpacity}%
+                <input
+                  type="range"
+                  min="60"
+                  max="100"
+                  step="1"
+                  value={prefs.glassOpacity}
+                  style={
+                    {
+                      "--progress": `${((prefs.glassOpacity - 60) / 40) * 100}%`,
+                    } as CSSProperties
+                  }
+                  disabled={!prefs.glass}
+                  onChange={(e) =>
+                    preference("glassOpacity", Number(e.target.value))
+                  }
+                />
+              </label>
+            </div>
+            <label className="check waveform-setting">
+              <input
+                type="checkbox"
+                checked={prefs.waveform}
+                onChange={(e) => preference("waveform", e.target.checked)}
+              />
+              {t("waveformProgress")}
+            </label>
             <button
               type="button"
               className="subtle"
@@ -191,6 +258,11 @@ export function SettingsPage() {
                   accent: defaults.accent,
                   background: "",
                   foreground: "",
+                  glass: defaults.glass,
+                  glassBlur: defaults.glassBlur,
+                  glassOpacity: defaults.glassOpacity,
+                  glassPopups: defaults.glassPopups,
+                  waveform: defaults.waveform,
                 })
               }
             >
@@ -199,6 +271,7 @@ export function SettingsPage() {
           </section>
           <section className="settings-section">
             <h3>{t("listening")}</h3>
+
             <div className="settings-grid">
               <label htmlFor="setting-gain">
                 {t("gain")}

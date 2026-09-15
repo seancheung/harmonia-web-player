@@ -11,6 +11,8 @@ import {
 } from "@tanstack/react-router";
 import {
   ArrowDownWideNarrow,
+  ArrowLeftToLine,
+  ArrowRightFromLine,
   ArrowUpNarrowWide,
   ArrowUpRight,
   AudioLines,
@@ -35,6 +37,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import React, {
   useEffect,
   useRef,
@@ -44,6 +47,8 @@ import React, {
 import {
   Cover,
   emptyRule,
+  FolderArtwork,
+  GenreCover,
   IconButton,
   Menu,
   Modal,
@@ -70,6 +75,8 @@ import { player } from "./player";
 import { PlayerBar } from "./player-ui";
 import { Select, SelectOption } from "./select";
 import { SettingsPage } from "./settings";
+import { ThemeToggle } from "./theme-toggle";
+import { TrackDetails } from "./track-details";
 import "./styles.css";
 
 const sections = [
@@ -85,16 +92,60 @@ const sections = [
 ] as const;
 function Shell() {
   const { t, lib } = useApp();
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    let compactHeader = false;
+    const updateHeader = () => {
+      const next = compactHeader ? window.scrollY > 8 : window.scrollY > 64;
+      if (mainRef.current) mainRef.current.dataset.scrolled = String(next);
+      compactHeader = next;
+    };
+    updateHeader();
+    window.addEventListener("scroll", updateHeader, { passive: true });
+    return () => window.removeEventListener("scroll", updateHeader);
+  }, []);
+  const [collapsed, setCollapsed] = useState(() =>
+    load("sidebarCollapsed", false),
+  );
+  const reducedMotion = useReducedMotion();
+  const [compact, setCompact] = useState(
+    () => window.matchMedia("(max-width: 1150px)").matches,
+  );
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 1150px)");
+    const update = () => setCompact(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  const transition = {
+    duration: reducedMotion ? 0 : 0.22,
+    ease: [0.22, 1, 0.36, 1] as const,
+  };
   return (
-    <div className="app-shell">
+    <motion.div
+      initial={false}
+      animate={{
+        "--sidebar-width": `${collapsed ? 76 : compact ? 195 : 228}px`,
+        "--sidebar-label-opacity": collapsed ? 0 : 1,
+      }}
+      transition={transition}
+      className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}
+    >
       <aside className="sidebar">
-        <Link to="/$section" params={{ section: "home" }} className="brand">
-          <span className="brand-icon">
-            <AudioLines size={24} />
-          </span>
-          harmonia<span className="brand-dot">.</span>
-        </Link>
-        <div className="library-caption">{t("library")}</div>
+        <div className="brand">
+          <Link
+            to="/$section"
+            params={{ section: "home" }}
+            style={{ display: "flex", alignItems: "center" }}
+          >
+            <span className="brand-icon">
+              <AudioLines size={24} />
+            </span>
+            <span className="brand-name">
+              harmonia<span className="brand-dot">.</span>
+            </span>
+          </Link>
+        </div>
         <nav>
           {sections.map(({ id, icon: Icon }) => (
             <Link
@@ -116,21 +167,41 @@ function Shell() {
           ))}
         </nav>
         <div className="sidebar-bottom">
+          <button
+            type="button"
+            className="sidebar-toggle"
+            aria-label={t(collapsed ? "expandSidebar" : "collapseSidebar")}
+            title={t(collapsed ? "expandSidebar" : "collapseSidebar")}
+            aria-expanded={!collapsed}
+            onClick={() => {
+              setCollapsed(!collapsed);
+              save("sidebarCollapsed", !collapsed);
+            }}
+          >
+            {collapsed ? (
+              <ArrowRightFromLine size={19} />
+            ) : (
+              <ArrowLeftToLine size={19} />
+            )}
+            <span>{t("collapse")}</span>
+          </button>
           <Link
+            aria-label={t("settings")}
+            title={t("settings")}
             to="/$section"
             params={{ section: "settings" }}
             activeProps={{ className: "nav-active" }}
           >
             <Settings2 size={19} />
-            {t("settings")}
+            <span>{t("settings")}</span>
           </Link>
         </div>
       </aside>
-      <main className="main">
+      <main ref={mainRef} className="main">
         <Outlet />
       </main>
       <PlayerBar />
-    </div>
+    </motion.div>
   );
 }
 function CreatePlaylistMenu({ expanded = false }: { expanded?: boolean }) {
@@ -490,7 +561,7 @@ function Browse({
     folder = parts.slice(1).join("|");
     const source = lib.sources.find((s) => s.id === sourceID);
     heading = folder.split("/").pop() || source?.name || t("folders");
-    subheading = source?.error || t("currentFolder");
+    subheading = source?.error || "";
     tracks = tracks.filter(
       (t) => t.sourceId === sourceID && t.folder === folder,
     );
@@ -550,6 +621,26 @@ function Browse({
       ? true
       : view.desc;
   if (!manual) tracks = sortTracks(tracks, sort, desc);
+  const playAllTracks =
+    section === "folders" && detail
+      ? sortTracks(
+          all.filter(
+            (track) =>
+              track.sourceId === sourceID &&
+              (!folder ||
+                track.folder === folder ||
+                track.folder.startsWith(`${folder}/`)) &&
+              (!search ||
+                [track.title, track.artist, track.album, track.genre]
+                  .join(" ")
+                  .toLowerCase()
+                  .includes(searchText)) &&
+              (!rule || matches(track, rule)),
+          ),
+          sort,
+          desc,
+        )
+      : tracks;
   const groups: Group[] = [];
   if (groupMode && ["albums", "artists", "genres"].includes(groupType)) {
     const map = new Map<string, Track[]>();
@@ -632,7 +723,7 @@ function Browse({
         modifiedAt: s.folderTimes?.[""]?.modifiedAt,
         createdAt: s.folderTimes?.[""]?.createdAt,
         name: s.name,
-        subtitle: s.error || s.path,
+        subtitle: s.error || "",
         tracks: all.filter((t) => t.sourceId === s.id),
         year: 0,
         addedAt: 0,
@@ -866,6 +957,7 @@ function Browse({
               </>
             ))}
         </nav>
+        <ThemeToggle />
       </div>
       <div className="page-content">
         <header
@@ -880,13 +972,13 @@ function Browse({
             {section === "playlists" && !detail ? (
               <CreatePlaylistMenu expanded />
             ) : (
-              tracks.length > 0 && (
+              playAllTracks.length > 0 && (
                 <button
                   type="button"
                   className="primary"
                   onClick={() =>
                     player.replace(
-                      tracks,
+                      playAllTracks,
                       0,
                       section === "albums" && detail ? "album" : "track",
                     )
@@ -1253,7 +1345,7 @@ function Browse({
           <div
             className={
               view.grid
-                ? `album-grid ${groupType === "folders" ? "folder-grid" : ""}`
+                ? `album-grid ${groupType === "folders" ? "folder-grid" : groupType === "artists" ? "artist-grid" : groupType === "playlists" ? "playlist-grid" : ""}`
                 : "group-list"
             }
           >
@@ -1268,9 +1360,9 @@ function Browse({
                   aria-label={group.name}
                 >
                   {groupType === "folders" ? (
-                    <div className="folder-art">
-                      <Folder size={38} />
-                    </div>
+                    <FolderArtwork />
+                  ) : groupType === "genres" ? (
+                    <GenreCover tracks={group.tracks} />
                   ) : (
                     <Cover
                       track={
@@ -1363,9 +1455,7 @@ function Browse({
                       className="group-cover"
                       aria-label={name}
                     >
-                      <div className="folder-art">
-                        <Folder size={38} />
-                      </div>
+                      <FolderArtwork />
                     </Link>
                     <div className="group-copy">
                       <Link {...destination}>
@@ -1599,28 +1689,7 @@ function Browse({
       </DialogPresence>
       <DialogPresence>
         {details && (
-          <Modal title={t("details")} close={() => setDetails(undefined)}>
-            <div className="detail-summary">
-              <Cover track={details} />
-              <h3>{details.title || details.filename}</h3>
-            </div>
-            <dl className="details-list">
-              {Object.entries(details)
-                .filter(([k]) => !["cover", "lyrics", "tags"].includes(k))
-                .map(([k, v]) => (
-                  <React.Fragment key={k}>
-                    <dt>{t(k as TextKey) || k}</dt>
-                    <dd>{String(v ?? "—")}</dd>
-                  </React.Fragment>
-                ))}
-              {Object.entries(details.tags || {}).map(([k, v]) => (
-                <React.Fragment key={`tag:${k}`}>
-                  <dt>{k}</dt>
-                  <dd>{v}</dd>
-                </React.Fragment>
-              ))}
-            </dl>
-          </Modal>
+          <TrackDetails track={details} close={() => setDetails(undefined)} />
         )}
       </DialogPresence>
     </>

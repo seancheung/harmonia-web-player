@@ -80,6 +80,44 @@ export function Cover({
     </div>
   );
 }
+export function FolderArtwork() {
+  return (
+    <div className="folder-art">
+      <svg viewBox="0 0 200 160" aria-hidden="true">
+        <path
+          className="folder-icon-back"
+          d="M8 38V24A12 12 0 0 1 20 12h42c9 0 13 3 19 10l10 12h89a12 12 0 0 1 12 12v96H8Z"
+        />
+        <path
+          className="folder-icon-edge"
+          d="M8 56a12 12 0 0 1 12-12h48c9 0 14-3 21-9h91a12 12 0 0 1 12 12v97a12 12 0 0 1-12 12H20a12 12 0 0 1-12-12Z"
+        />
+        <path
+          className="folder-icon-front"
+          d="M8 58a12 12 0 0 1 12-12h48c9 0 14-3 21-9h91a12 12 0 0 1 12 12v91a12 12 0 0 1-12 12H20a12 12 0 0 1-12-12Z"
+        />
+      </svg>
+    </div>
+  );
+}
+export function GenreCover({ tracks }: { tracks: Track[] }) {
+  const albums = new Set<string>();
+  const covers: Track[] = [];
+  for (const track of tracks) {
+    if (!track.hasCover || albums.has(track.albumId)) continue;
+    albums.add(track.albumId);
+    covers.push(track);
+    if (covers.length === 4) break;
+  }
+  if (covers.length < 2) return <Cover track={covers[0] || tracks[0]} />;
+  return (
+    <div className={`genre-cover genre-cover-${covers.length}`}>
+      {covers.map((track) => (
+        <Cover key={track.albumId} track={track} />
+      ))}
+    </div>
+  );
+}
 export function Menu({
   children,
   items,
