@@ -89,6 +89,31 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("player behavior", () => {
+  it("selects remote outputs before a song and sends later playback to them", async () => {
+    const p = new Player();
+    const remote = vi.spyOn(p, "remote").mockResolvedValue(undefined);
+    await p.startRemote(["speaker"]);
+    expect(remote.mock.calls).toEqual([
+      [{ action: "outputs", outputs: ["speaker"] }],
+    ]);
+    expect(p.state.remote).toBe(true);
+    expect(p.state.loading).toBe(false);
+    expect(p.state.playing).toBe(false);
+    expect(new Player().state.remote).toBe(true);
+    p.replace([track("one")]);
+    await flush();
+    expect(remote).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "start", ids: ["one"] }),
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("keeps local output when selecting a speaker fails with an empty queue", async () => {
+    const p = new Player();
+    vi.spyOn(p, "remote").mockRejectedValue(new Error("unavailable"));
+    await p.startRemote(["speaker"]);
+    expect(p.state.remote).toBe(false);
+    expect(p.state.loading).toBe(false);
+  });
   it("reuses iOS media playback across pause and track changes with gain enabled", async () => {
     const audioSession = { type: "auto" };
     vi.stubGlobal("navigator", { userAgent: "iPhone", audioSession });

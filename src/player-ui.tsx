@@ -144,7 +144,9 @@ export function PlayerBar() {
           setDevices(r.outputs || []);
           setDeviceError(r.error || "");
           setSelected(
-            (r.outputs || []).filter((d) => d.selected).map((d) => d.id),
+            player.snapshot().remote
+              ? (r.outputs || []).filter((d) => d.selected).map((d) => d.id)
+              : [],
           );
         })
         .catch((e) => setDeviceError(e.message));
@@ -467,15 +469,13 @@ export function PlayerBar() {
             <p className="help">{t("airplayHint")}</p>
             <button
               type="button"
-              className={`output-option ${!s.remote ? "active" : ""}`}
-              onClick={() => {
-                if (s.remote) void player.local();
-                else setPanel(null);
-              }}
+              className={`output-option ${!selected.length ? "active" : ""}`}
+              aria-pressed={!selected.length}
+              onClick={() => setSelected([])}
             >
               <MonitorSpeaker size={24} />
               <span>{t("local")}</span>
-              {!s.remote && <span>✓</span>}
+              {!selected.length && <span>✓</span>}
             </button>
             {devices.map((device) => (
               <div className="device-row" key={device.id}>
@@ -531,9 +531,10 @@ export function PlayerBar() {
               <button
                 type="button"
                 className="primary"
-                disabled={!selected.length || !track}
+                disabled={s.loading}
                 onClick={() => {
-                  void player.startRemote(selected);
+                  if (selected.length) void player.startRemote(selected);
+                  else if (s.remote) void player.local();
                   setPanel(null);
                 }}
               >

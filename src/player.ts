@@ -861,6 +861,16 @@ export class Player {
     this.emit({ playing: false, loading: true });
     try {
       if (outputs) await this.remote({ action: "outputs", outputs });
+      if (!transfer.queue.length) {
+        this.emit({
+          remote: true,
+          loading: false,
+          error: "",
+          mediaDiagnostics: undefined,
+        });
+        this.persist();
+        return;
+      }
       const p = this.prefs();
       await this.remote({
         action: "start",
