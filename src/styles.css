@@ -727,6 +727,26 @@ p {
   opacity: 1;
   transform: none;
 }
+:is(.group-list, .album-grid)
+  .group-card
+  > .icon-button:enabled:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  color: var(--accent);
+  transform: scale(1.08);
+  box-shadow: 0 4px 16px #0003;
+}
+:is(.group-list, .album-grid) .group-card > .icon-button:enabled:active {
+  transform: scale(0.92);
+  background: color-mix(in srgb, var(--accent) 24%, var(--surface));
+  box-shadow: 0 1px 4px #0002;
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.group-list, .album-grid)
+    .group-card
+    > .icon-button:enabled:is(:hover, :focus-visible, :active) {
+    transform: none;
+  }
+}
 .group-list .group-copy {
   text-align: left;
 }
@@ -3485,5 +3505,25 @@ button:is(.song-title, .home-title, .file-name):enabled:is(
 @media (max-width: 400px) {
   .song-column-options {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.song-art > svg {
+  transition:
+    opacity 150ms,
+    scale 150ms;
+}
+.song-art:enabled:is(:hover, :focus-visible) > svg {
+  scale: 1.12;
+}
+.song-art:enabled:active > svg {
+  scale: 0.9;
+}
+@media (prefers-reduced-motion: reduce) {
+  .song-art > svg {
+    transition: none;
+  }
+  .song-art:enabled:is(:hover, :focus-visible, :active) > svg {
+    scale: 1;
   }
 }
