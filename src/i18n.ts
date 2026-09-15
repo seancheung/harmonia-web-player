@@ -199,6 +199,9 @@ export const en = {
   stop: "Stop",
   connection: "Server connection",
   serverURL: "Server URL (empty = same origin)",
+  stopScan: "Stop scan",
+  scanStopping: "Stopping…",
+  scanCancelled: "Scan stopped",
   tagSeparators: "Tag parsing",
   extraSeparators: "Additional separators",
   tagSeparatorsHint:
@@ -471,6 +474,9 @@ export const zh: Record<TextKey, string> = {
   stop: "停止",
   connection: "连接服务端",
   serverURL: "服务端地址（留空使用同源）",
+  stopScan: "终止更新",
+  scanStopping: "正在终止…",
+  scanCancelled: "更新已终止",
   tagSeparators: "标签解析",
   extraSeparators: "额外分隔符",
   tagSeparatorsHint:

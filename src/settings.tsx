@@ -32,6 +32,8 @@ interface Capabilities {
 }
 interface Scan {
   running: boolean;
+  stopping?: boolean;
+  cancelled?: boolean;
   processed: number;
   total: number;
   errors: string[];
@@ -395,6 +397,20 @@ export function SettingsPage() {
               >
                 {t("rescan")}
               </button>
+              {scan?.running && (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={scan.stopping}
+                  onClick={() =>
+                    void run(async () =>
+                      setScan(await api<Scan>("/scan", "DELETE")),
+                    )
+                  }
+                >
+                  {t(scan.stopping ? "scanStopping" : "stopScan")}
+                </button>
+              )}
             </div>
             {scan && (
               <div className="scan-status">
@@ -405,7 +421,7 @@ export function SettingsPage() {
                   {scan.running
                     ? `${scan.processed} / ${scan.total}`
                     : scan.finishedAt
-                      ? t("scanDone")
+                      ? t(scan.cancelled ? "scanCancelled" : "scanDone")
                       : ""}
                 </span>
                 {scan.errors?.map((error, i) => (
