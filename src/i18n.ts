@@ -1,4 +1,7 @@
 export const en = {
+  songColumns: "Additional columns",
+  songColumnsHint:
+    "Choose extra columns for song lists. Saved only in this browser; scroll horizontally on smaller screens.",
   switchToTheme: "Switch to",
   waveformProgress: "Use waveform seek bar",
   sourceNameExists:
@@ -299,6 +302,9 @@ export const en = {
 export type TextKey = keyof typeof en;
 export const zh: Record<TextKey, string> = {
   ...en,
+  songColumns: "显示列",
+  songColumnsHint:
+    "选择歌曲列表的附加信息列，仅保存在当前浏览器。窄屏可横向滚动查看。",
   switchToTheme: "切换为",
   waveformProgress: "使用波形播放进度条",
   sourceNameExists: "音乐来源名称已存在，请使用其他名称。",

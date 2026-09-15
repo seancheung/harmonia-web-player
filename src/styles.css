@@ -3328,9 +3328,19 @@ p {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.home-page a:hover,
-.home-title:hover {
+.home-page a:hover {
   text-decoration: underline;
+}
+button:is(.song-title, .home-title, .file-name):enabled:is(
+  :hover,
+  :focus-visible
+) {
+  color: var(--accent);
+  text-decoration: none;
+}
+.queue-item > button:first-child:enabled:is(:hover, :focus-visible) strong {
+  color: var(--accent);
+  text-decoration: none;
 }
 .home-artist-grid {
   display: grid;
@@ -3440,4 +3450,40 @@ p {
   flex-shrink: 0;
   width: 32px;
   height: 32px;
+}
+
+.song-list-extra {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.song-list.song-list-extra > :is(.song-row, .song-table-header) {
+  grid-template-columns: var(--song-columns);
+  min-width: var(--song-list-width);
+  gap: 14px;
+}
+.song-list.song-list-extra
+  :is(.song-album, .song-year, .song-duration, .song-table-header > span) {
+  display: block;
+}
+.song-list-extra .song-extra-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+.song-list-extra .song-actions > .icon-button {
+  display: flex;
+}
+.song-column-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+@media (max-width: 400px) {
+  .song-column-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

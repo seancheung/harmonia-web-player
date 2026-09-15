@@ -18,6 +18,7 @@ import {
   AudioLines,
   ChevronLeft,
   ChevronRight,
+  Columns3,
   Disc3,
   Folder,
   Grid2X2,
@@ -47,6 +48,7 @@ import React, {
 import {
   Cover,
   emptyRule,
+  FavoriteButton,
   FolderArtwork,
   GenreCover,
   IconButton,
@@ -75,6 +77,7 @@ import { player } from "./player";
 import { PlayerBar } from "./player-ui";
 import { Select, SelectOption } from "./select";
 import { SettingsPage } from "./settings";
+import { type SongColumn, songColumns, songColumnValue } from "./song-columns";
 import { ThemeToggle } from "./theme-toggle";
 import { TrackDetails } from "./track-details";
 import "./styles.css";
@@ -428,7 +431,18 @@ function Browse({
   detail?: string;
   preset?: string;
 }) {
-  const { t, lib, error, busy, reload, run, notice } = useApp();
+  const { t, lib, prefs, error, busy, reload, run, notice } = useApp();
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [extraColumns, setExtraColumns] = useState<SongColumn[]>(() => {
+    const stored = load<unknown>("songColumns", []);
+    return songColumns
+      .filter((column) => Array.isArray(stored) && stored.includes(column.id))
+      .map((column) => column.id);
+  });
+  const changeColumns = (columns: SongColumn[]) => {
+    setExtraColumns(columns);
+    save("songColumns", columns);
+  };
   const splitMembers = (text: string) =>
     splitTagMembers(text, lib.tagSeparators || "");
   const [view, setView] = useState<ViewPrefs>(() => ({
@@ -1182,6 +1196,15 @@ function Browse({
             {t("filter")}
             {rule && <span className="smart-dot" />}
           </button>
+          {!view.grid && !groupMode && (
+            <IconButton
+              label={t("songColumns")}
+              active={extraColumns.length > 0}
+              onClick={() => setColumnsOpen(true)}
+            >
+              <Columns3 size={17} />
+            </IconButton>
+          )}
           <div className="view-toggle">
             <IconButton
               label={t("grid")}
@@ -1283,64 +1306,6 @@ function Browse({
               </button>
             )}
           </div>
-        ) : section === "folders" && !view.grid ? (
-          <table className="file-browser" aria-label={t("folders")}>
-            <tbody>
-              <tr className="file-browser-row file-browser-header">
-                <th scope="col">{t("filename")}</th>
-                <th scope="col">{t("modifiedAt")}</th>
-                <th scope="col">{t("createdAt")}</th>
-                <th scope="col">{t("duration")}</th>
-              </tr>
-              {(groupMode
-                ? pageGroups.map((group) => ({
-                    id: group.id,
-                    name: group.name,
-                    modifiedAt: group.modifiedAt,
-                    createdAt: group.createdAt,
-                  }))
-                : pageFolders.map((name) => {
-                    const path = folder ? `${folder}/${name}` : name;
-                    const times = lib.sources.find(
-                      (source) => source.id === sourceID,
-                    )?.folderTimes?.[path];
-                    return { id: `${sourceID}|${path}`, name, ...times };
-                  })
-              ).map((entry) => (
-                <tr className="file-browser-row" key={entry.id}>
-                  <td>
-                    <Link {...link("folders", entry.id)}>{entry.name}</Link>
-                  </td>
-                  <td>{formatFileTime(entry.modifiedAt)}</td>
-                  <td>{formatFileTime(entry.createdAt)}</td>
-                  <td>—</td>
-                </tr>
-              ))}
-              {!groupMode &&
-                pageTracks.map((track) => (
-                  <tr className="file-browser-row" key={track.id}>
-                    <td>
-                      <button
-                        type="button"
-                        className="file-name"
-                        disabled={track.missing}
-                        onClick={() =>
-                          player.replace(
-                            tracks,
-                            tracks.findIndex((item) => item.id === track.id),
-                          )
-                        }
-                      >
-                        {track.filename}
-                      </button>
-                    </td>
-                    <td>{formatFileTime(track.modifiedAt)}</td>
-                    <td>{formatFileTime(track.createdAt)}</td>
-                    <td>{duration(track.duration)}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
         ) : groupMode ? (
           <div
             className={
@@ -1473,7 +1438,21 @@ function Browse({
                 );
               })}
             </div>
-            <div className={view.grid ? "song-grid" : "song-list"}>
+            <div
+              className={
+                view.grid
+                  ? "song-grid"
+                  : `song-list ${extraColumns.length ? "song-list-extra" : ""}`
+              }
+              style={
+                !view.grid && extraColumns.length
+                  ? ({
+                      "--song-columns": `30px minmax(200px, 2fr) minmax(160px, 1fr) 50px 54px repeat(${extraColumns.length}, minmax(160px, 1fr)) 84px`,
+                      "--song-list-width": `${720 + extraColumns.length * 174}px`,
+                    } as React.CSSProperties)
+                  : undefined
+              }
+            >
               {!view.grid && (
                 <div className="song-table-header">
                   <span>#</span>
@@ -1481,6 +1460,11 @@ function Browse({
                   <span>{t("album")}</span>
                   <span>{t("year")}</span>
                   <span>{t("duration")}</span>
+                  {songColumns
+                    .filter((column) => extraColumns.includes(column.id))
+                    .map((column) => (
+                      <span key={column.id}>{t(column.label)}</span>
+                    ))}
                   <span />
                 </div>
               )}
@@ -1560,9 +1544,6 @@ function Browse({
                             ))
                           : t("unknownArtist")}
                       </div>
-                      {section === "folders" && (
-                        <small className="muted">{track.filename}</small>
-                      )}
                     </div>
                   </div>
                   <Link
@@ -1575,8 +1556,21 @@ function Browse({
                   <span className="song-duration">
                     {duration(track.duration)}
                   </span>
+                  {!view.grid &&
+                    extraColumns.map((id) => {
+                      const value = songColumnValue(track, id, prefs.language);
+                      return (
+                        <span
+                          key={id}
+                          className="song-extra-value"
+                          title={value}
+                        >
+                          {value}
+                        </span>
+                      );
+                    })}
                   <div className="song-actions">
-                    <IconButton
+                    <FavoriteButton
                       label={t("favorite")}
                       active={track.favorite}
                       disabled={track.missing}
@@ -1586,7 +1580,7 @@ function Browse({
                         size={17}
                         fill={track.favorite ? "currentColor" : "none"}
                       />
-                    </IconButton>
+                    </FavoriteButton>
                     {menu(track)}
                   </div>
                 </article>
@@ -1692,6 +1686,44 @@ function Browse({
           <TrackDetails track={details} close={() => setDetails(undefined)} />
         )}
       </DialogPresence>
+      <DialogPresence>
+        {columnsOpen && (
+          <Modal title={t("songColumns")} close={() => setColumnsOpen(false)}>
+            <p className="help">{t("songColumnsHint")}</p>
+            <div className="song-column-options">
+              {songColumns.map((column) => (
+                <label className="check" key={column.id}>
+                  <input
+                    type="checkbox"
+                    checked={extraColumns.includes(column.id)}
+                    onChange={(event) =>
+                      changeColumns(
+                        songColumns
+                          .filter((item) =>
+                            item.id === column.id
+                              ? event.target.checked
+                              : extraColumns.includes(item.id),
+                          )
+                          .map((item) => item.id),
+                      )
+                    }
+                  />
+                  {t(column.label)}
+                </label>
+              ))}
+            </div>
+            <footer>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => changeColumns([])}
+              >
+                {t("reset")}
+              </button>
+            </footer>
+          </Modal>
+        )}
+      </DialogPresence>
     </>
   );
 }
@@ -1738,8 +1770,4 @@ declare module "@tanstack/react-router" {
 }
 export default function App() {
   return <RouterProvider router={router} />;
-}
-
-function formatFileTime(value?: number) {
-  return value ? new Date(value).toLocaleString() : "—";
 }

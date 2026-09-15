@@ -21,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Cover, IconButton, Modal } from "./components";
+import { Cover, FavoriteButton, IconButton, Modal } from "./components";
 import { useApp } from "./context";
 import { DialogPresence } from "./dialog-presence";
 import type { TextKey } from "./i18n";
@@ -55,7 +55,7 @@ export function PlayerBar() {
   const [pairID, setPairID] = useState("");
   const track = s.queue[s.index];
   const favoriteButton = (
-    <IconButton
+    <FavoriteButton
       label={t("favorite")}
       active={track?.favorite}
       disabled={!track}
@@ -69,7 +69,7 @@ export function PlayerBar() {
       }
     >
       <Heart size={18} fill={track?.favorite ? "currentColor" : "none"} />
-    </IconButton>
+    </FavoriteButton>
   );
   const currentLine = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);

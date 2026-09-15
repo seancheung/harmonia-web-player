@@ -16,7 +16,8 @@ import {
   useTransitionStyles,
 } from "@floating-ui/react";
 import { MoreHorizontal, Music2, Plus, Trash2, X } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { motion, useAnimationControls, useReducedMotion } from "motion/react";
+import { type ComponentProps, type ReactNode, useRef, useState } from "react";
 import { useApp } from "./context";
 import { useDialogPresence } from "./dialog-presence";
 import type { TextKey } from "./i18n";
@@ -48,6 +49,40 @@ export function IconButton({
     >
       {children}
     </button>
+  );
+}
+export function FavoriteButton({
+  label,
+  children,
+  onClick,
+  active,
+  disabled = false,
+}: ComponentProps<typeof IconButton>) {
+  const controls = useAnimationControls();
+  const reducedMotion = useReducedMotion();
+  return (
+    <motion.button
+      type="button"
+      className={`icon-button ${active ? "active" : ""}`}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      disabled={disabled}
+      animate={controls}
+      whileTap={!disabled && !reducedMotion ? { scale: 0.85 } : undefined}
+      onClick={() => {
+        if (!reducedMotion) {
+          controls.stop();
+          void controls.start({
+            scale: active ? [0.9, 1.08, 1] : [0.85, 1.22, 0.96, 1],
+            transition: { duration: 0.3, ease: "easeOut" },
+          });
+        }
+        onClick?.();
+      }}
+    >
+      {children}
+    </motion.button>
   );
 }
 export function Cover({
