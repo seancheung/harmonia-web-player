@@ -14,6 +14,9 @@ class AudioClock {
   createGain() {
     return { gain: { value: 1 }, connect() {}, disconnect() {} };
   }
+  createMediaElementSource() {
+    return { connect() {}, disconnect() {} };
+  }
   decodeAudioData() {
     return Promise.resolve({ duration: 2 });
   }
@@ -66,6 +69,7 @@ beforeEach(() => {
     setItem: (key: string, value: string) => values.set(key, value),
   });
   vi.stubGlobal("window", {
+    location: new URL("http://192.168.3.50:5173/home"),
     addEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   });
@@ -85,6 +89,128 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("player behavior", () => {
+  it("reuses iOS media playback across pause and track changes with gain enabled", async () => {
+    const audioSession = { type: "auto" };
+    vi.stubGlobal("navigator", { userAgent: "iPhone", audioSession });
+    const elements: MobileAudio[] = [];
+    class MobileAudio {
+      private source = "";
+      private needsLoad = false;
+      get src() {
+        return this.source;
+      }
+      set src(value: string) {
+        this.source = value;
+        this.needsLoad = true;
+      }
+      crossOrigin: string | null = "";
+      preload = "";
+      volume = 1;
+      readyState = 4;
+      currentTime = 0;
+      paused = true;
+      ended = false;
+      seeking = false;
+      constructor() {
+        elements.push(this);
+      }
+      getAttribute() {
+        return this.src;
+      }
+      removeAttribute() {
+        this.src = "";
+      }
+      load() {
+        this.needsLoad = false;
+      }
+      play() {
+        if (this.needsLoad)
+          return Promise.reject(
+            new DOMException(
+              "The operation is not supported",
+              "NotSupportedError",
+            ),
+          );
+        this.paused = false;
+        return Promise.resolve();
+      }
+      pause() {
+        this.paused = true;
+      }
+    }
+    vi.stubGlobal("Audio", MobileAudio);
+    save("preferences", { ...defaults, gain: "track" });
+    const p = new Player();
+    p.replace([{ ...track("one"), trackGain: -6 }, track("two")]);
+    await flush();
+    expect(audioSession.type).toBe("playback");
+    expect(p.state.playing).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(elements[0].crossOrigin).toBeNull();
+    elements[0].currentTime = 0.7;
+    p.pause();
+    expect(p.state.position).toBe(0.7);
+    await p.play();
+    expect(elements[0].currentTime).toBe(0.7);
+    save("preferences", {
+      ...defaults,
+      gain: "track",
+      api: "http://192.168.3.50:8090",
+    });
+    p.next();
+    await flush();
+    expect(elements).toHaveLength(1);
+    expect(elements[0].src).toContain("/tracks/two/stream");
+    expect(elements[0].crossOrigin).toBe("anonymous");
+    expect(p.state.index).toBe(1);
+    expect(p.state.playing).toBe(true);
+  });
+  it("does not skip the queue when Safari rejects a media source", async () => {
+    vi.stubGlobal("navigator", { userAgent: "iPhone" });
+    const cancel = vi.fn(async () => {});
+    vi.mocked(fetch).mockResolvedValue({
+      status: 403,
+      headers: new Headers({ "Content-Type": "application/json" }),
+      body: { cancel },
+    } as unknown as Response);
+    let attempts = 0;
+    class UnsupportedAudio {
+      src = "";
+      readyState = 0;
+      getAttribute() {
+        return this.src;
+      }
+      removeAttribute() {
+        this.src = "";
+      }
+      load() {}
+      pause() {}
+      play() {
+        attempts++;
+        return Promise.reject(
+          new DOMException(
+            "The operation is not supported",
+            "NotSupportedError",
+          ),
+        );
+      }
+    }
+    vi.stubGlobal("Audio", UnsupportedAudio);
+    const p = new Player();
+    p.replace(Array.from({ length: 500 }, (_, i) => track(String(i))));
+    await flush();
+    expect(attempts).toBe(1);
+    expect(p.state.index).toBe(0);
+    expect(p.state.error).toBe("mediaSourceError");
+    expect(p.state.loading).toBe(false);
+    expect(p.state.mediaDiagnostics).toContain("HTTP 403");
+    expect(p.state.mediaDiagnostics).toContain("application/json");
+    expect(p.state.mediaDiagnostics).not.toContain("token=");
+    expect(cancel).toHaveBeenCalled();
+    await p.play();
+    expect(attempts).toBe(2);
+    expect(p.state.index).toBe(0);
+  });
   it("saves a large queue separately from progress and restores its position", async () => {
     const queue = Array.from({ length: 500 }, (_, i) => track(String(i)));
     save("playback", { queue, index: 450, position: 0.5 });

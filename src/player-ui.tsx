@@ -59,6 +59,23 @@ export function PlayerBar() {
   const [pin, setPin] = useState("");
   const [pairID, setPairID] = useState("");
   const track = s.queue[s.index];
+  const favoriteButton = (
+    <IconButton
+      label={t("favorite")}
+      active={track?.favorite}
+      disabled={!track}
+      onClick={() =>
+        track &&
+        void run(() =>
+          api(`/tracks/${track.id}/favorite`, "PUT", {
+            favorite: !track.favorite,
+          }),
+        )
+      }
+    >
+      <Heart size={18} fill={track?.favorite ? "currentColor" : "none"} />
+    </IconButton>
+  );
   const currentLine = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const panelOpen = panel === "queue" || panel === "lyrics";
@@ -143,24 +160,7 @@ export function PlayerBar() {
             </strong>
             <p>{track?.artist || t("playerHint")}</p>
           </div>
-          {track && (
-            <IconButton
-              label={t("favorite")}
-              active={track.favorite}
-              onClick={() =>
-                void run(() =>
-                  api(`/tracks/${track.id}/favorite`, "PUT", {
-                    favorite: !track.favorite,
-                  }),
-                )
-              }
-            >
-              <Heart
-                size={18}
-                fill={track.favorite ? "currentColor" : "none"}
-              />
-            </IconButton>
-          )}
+          {track && favoriteButton}
         </div>
         <div className="playback-controls">
           <div className="transport">
@@ -240,6 +240,7 @@ export function PlayerBar() {
           </div>
         </div>
         <div className="player-extras">
+          <div className="mobile-favorite">{favoriteButton}</div>
           <div className="player-sleep">
             <IconButton
               label={t("sleep")}
@@ -303,6 +304,12 @@ export function PlayerBar() {
       {s.error && (
         <div className="player-error" role="alert">
           {t(s.error as TextKey) || s.error}
+          {s.mediaDiagnostics && (
+            <div>
+              {t("mediaDiagnosticLabel")}:{" "}
+              {t(s.mediaDiagnostics as TextKey) || s.mediaDiagnostics}
+            </div>
+          )}
         </div>
       )}
       {(s.deadline > 0 || s.waiting) && (

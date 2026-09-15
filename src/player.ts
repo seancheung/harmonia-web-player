@@ -8,6 +8,11 @@ import {
   save,
   type Track,
 } from "./model";
+import {
+  prefersMediaElement,
+  SystemMedia,
+  setPlaybackSession,
+} from "./system-media";
 
 export interface Playback {
   queue: Track[];
@@ -20,6 +25,7 @@ export interface Playback {
   playing: boolean;
   loading: boolean;
   error: string;
+  mediaDiagnostics?: string;
   remote: boolean;
   deadline: number;
   finish: boolean;
@@ -65,6 +71,8 @@ export class Player {
   private nextIndex = -1;
   private audio: HTMLAudioElement | null = null;
   private audioNode: MediaElementAudioSourceNode | null = null;
+  private mediaElement: HTMLAudioElement | null = null;
+  private systemMedia: SystemMedia | null = null;
   private start = 0;
   private offset = 0;
   private generation = 0;
@@ -84,6 +92,20 @@ export class Player {
   private remoteSync: Promise<void> | null = null;
   constructor() {
     if (typeof window === "undefined") return;
+    this.systemMedia = new SystemMedia({
+      play: () => {
+        void this.play();
+      },
+      pause: () => this.pause(),
+      stop: () => {
+        this.pause();
+        this.seek(0);
+      },
+      nexttrack: () => this.next(),
+      previoustrack: () => this.previous(),
+      seek: (position) => this.seek(position),
+      position: () => this.state.position,
+    });
     setInterval(() => this.tick(), 200);
     window.addEventListener("pagehide", () => this.persist());
   }
@@ -94,6 +116,7 @@ export class Player {
   snapshot = () => this.state;
   private emit(patch: Partial<Playback> = {}) {
     this.state = { ...this.state, ...patch };
+    this.systemMedia?.update(this.state);
     for (const fn of this.listeners) fn();
   }
   private prefs(): Preferences {
@@ -121,6 +144,7 @@ export class Player {
     }
   }
   private async setup() {
+    setPlaybackSession();
     if (!this.context) {
       this.context = new AudioContext();
       this.gain = this.context.createGain();
@@ -153,7 +177,7 @@ export class Player {
     this.cancelNext();
     if (this.state.playing && this.currentBuffer) void this.preload();
   }
-  private dispose() {
+  private dispose(preserveMedia = false) {
     this.generation++;
     this.controller?.abort();
     this.controller = null;
@@ -167,11 +191,18 @@ export class Player {
       this.source = null;
     }
     if (this.audio) {
+      this.audio.onpause = null;
+      this.audio.onplaying = null;
+      this.audio.ontimeupdate = null;
+      this.audio.onseeked = null;
+      this.audio.onended = null;
+      this.audio.onerror = null;
+      this.audio.onloadedmetadata = null;
       this.audio.pause();
-      this.audio.removeAttribute("src");
-      this.audio.load();
-      this.audioNode?.disconnect();
-      this.audioNode = null;
+      if (!preserveMedia) {
+        this.audio.removeAttribute("src");
+        this.audio.load();
+      }
       this.audio = null;
     }
     this.currentBuffer = null;
@@ -240,9 +271,9 @@ export class Player {
       newSession = true;
     }
     const position = this.state.position;
-    this.dispose();
+    this.dispose(prefersMediaElement());
     const generation = this.generation;
-    this.emit({ loading: true, error: "" });
+    this.emit({ loading: true, error: "", mediaDiagnostics: undefined });
     if (newSession || !this.session) {
       this.session = sessionID();
       this.listened = 0;
@@ -251,7 +282,12 @@ export class Player {
     }
     try {
       if (t.missing) throw new Error("missing");
-      await this.setup();
+      const ready = this.setup();
+      if (prefersMediaElement()) {
+        await this.stream(t, position, generation, ready);
+        return;
+      }
+      await ready;
       if (generation !== this.generation) return;
       this.controller = new AbortController();
       if (t.size > 100 * 1024 * 1024) {
@@ -287,29 +323,112 @@ export class Player {
         (e instanceof DOMException && e.name === "AbortError")
       )
         return;
-      this.fail(e);
+      if (
+        prefersMediaElement() &&
+        e instanceof Error &&
+        e.name === "NotSupportedError"
+      ) {
+        this.mediaFailure(t, e, this.audio?.error?.code);
+      } else this.fail(e);
     }
   }
-  private async stream(t: Track, position: number, generation: number) {
-    if (!this.context || !this.gain) return;
-    const audio = new Audio();
+  private async stream(
+    t: Track,
+    position: number,
+    generation: number,
+    ready = Promise.resolve(),
+  ) {
+    if (!this.context || !this.gain) {
+      await ready;
+      return;
+    }
+    const audio = this.mediaElement ?? new Audio();
+    this.mediaElement = audio;
     this.audio = audio;
-    audio.crossOrigin = "anonymous";
+    const url = mediaURL(t);
+    audio.crossOrigin =
+      new URL(url, window.location.href).origin === window.location.origin
+        ? null
+        : "anonymous";
     audio.preload = "auto";
-    audio.src = mediaURL(t);
-    this.audioNode = this.context.createMediaElementSource(audio);
-    this.audioNode.connect(this.gain);
+    if (!this.audioNode) {
+      this.audioNode = this.context.createMediaElementSource(audio);
+      this.audioNode.connect(this.gain);
+    }
+    const sameSource = audio.getAttribute("src") === url;
     audio.onloadedmetadata = () => {
-      audio.currentTime = position;
+      if (generation === this.generation && position > 0)
+        audio.currentTime = position;
+    };
+    if (sameSource && audio.readyState >= 1) audio.currentTime = position;
+    audio.onpause = () => {
+      if (generation !== this.generation || audio.ended || this.state.loading)
+        return;
+      this.emit({ playing: false, position: audio.currentTime });
+      this.persist();
+    };
+    audio.onplaying = () => {
+      if (generation !== this.generation) return;
+      this.lastTick = performance.now();
+      this.emit({ playing: true, loading: false });
+    };
+    audio.ontimeupdate = () => {
+      if (generation === this.generation) this.tick();
+    };
+    audio.onseeked = () => {
+      if (generation !== this.generation) return;
+      this.seeked = true;
+      this.lastTick = performance.now();
+      this.emit({ position: audio.currentTime });
     };
     audio.onended = () => this.ended();
     audio.onerror = () => {
-      if (generation === this.generation) this.fail(new Error("unsupported"));
+      if (generation !== this.generation) return;
+      // Source and network errors can affect the entire queue, not one track.
+      const code = audio.error?.code;
+      this.mediaFailure(
+        t,
+        new Error(code === 2 ? "mediaNetworkError" : "mediaSourceError"),
+        code,
+      );
     };
-    await audio.play();
+    if (!sameSource || audio.error) {
+      audio.src = url;
+      audio.load();
+    }
+    // Start within the user gesture, without waiting for AudioContext.resume().
+    await Promise.all([ready, audio.play()]);
     if (generation !== this.generation) return;
     this.lastTick = performance.now();
     this.emit({ playing: true, loading: false });
+  }
+  private mediaFailure(track: Track, error: Error, code?: number) {
+    this.fail(error, true);
+    const generation = this.generation;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const label = `MediaError ${code ?? "unknown"} / ${error.name}`;
+    this.emit({ mediaDiagnostics: label });
+    void fetch(mediaURL(track), {
+      headers: { Range: "bytes=0-1" },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const details = [
+          label,
+          `HTTP ${response.status}`,
+          response.headers.get("Content-Type") || "Content-Type missing",
+          response.headers.get("Content-Range") || "Content-Range missing",
+        ];
+        await response.body?.cancel();
+        if (generation === this.generation)
+          this.emit({ mediaDiagnostics: details.join(" · ") });
+      })
+      .catch(() => {
+        if (generation === this.generation)
+          this.emit({ mediaDiagnostics: "mediaDiagnosticNetwork" });
+      })
+      .finally(() => clearTimeout(timeout));
   }
   private candidate(manual = false): number {
     const { queue, index, repeat, shuffle } = this.state;
@@ -434,12 +553,21 @@ export class Player {
       void this.play(true);
     }
   }
-  private fail(error: unknown) {
+  private fail(error: unknown, stop = false) {
     const id = this.state.queue[this.state.index]?.id;
     if (id) this.failed.add(id);
-    const message = error instanceof Error ? error.message : "unsupported";
+    const name = error instanceof Error ? error.name : "";
+    const blocked = name === "NotAllowedError";
+    const unsupported = name === "NotSupportedError";
+    const message = blocked
+      ? "mediaPlaybackBlocked"
+      : unsupported
+        ? "mediaSourceError"
+        : error instanceof Error
+          ? error.message
+          : "unsupported";
     this.emit({ error: message, loading: false, playing: false });
-    if (this.prefs().failure === "skip") {
+    if (!stop && !blocked && !unsupported && this.prefs().failure === "skip") {
       const next = this.candidate(true);
       if (next >= 0) {
         this.emit({ index: next, position: 0 });
@@ -456,6 +584,13 @@ export class Player {
       return;
     }
     this.report(false);
+    if (this.audio && prefersMediaElement()) {
+      const position = this.audio.currentTime;
+      this.dispose(true);
+      this.emit({ playing: false, loading: false, position });
+      this.persist();
+      return;
+    }
     this.dispose();
     this.emit({ playing: false, loading: false });
     this.persist();

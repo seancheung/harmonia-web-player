@@ -2234,6 +2234,7 @@ p {
   }
 }
 .mobile-transport,
+.mobile-favorite,
 .compact-volume {
   display: none;
 }
@@ -2902,15 +2903,21 @@ p {
     left: 12px;
     right: 12px;
     bottom: calc(8px + env(safe-area-inset-bottom));
-    justify-content: space-between;
-    gap: 2px;
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    justify-items: center;
+    gap: 0;
   }
   .player-extras .icon-button {
-    width: 40px;
-    height: 40px;
+    width: 100%;
+    max-width: 44px;
+    min-width: 0;
+    height: 44px;
   }
-  .mobile-transport {
-    gap: 2px;
+  .mobile-favorite,
+  .player-extras .player-sleep,
+  .player-extras .mobile-transport {
+    display: contents;
   }
   .player-panel,
   .timer-badge {

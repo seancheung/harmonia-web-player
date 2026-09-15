@@ -1,4 +1,12 @@
 export const en = {
+  mediaDiagnosticLabel: "Audio request diagnostics",
+  mediaDiagnosticNetwork:
+    "The browser could not access the audio response (network, CORS, HTTPS policy or timeout).",
+  mediaSourceError:
+    "The browser could not load this audio. Check the server connection and the selected conversion output format, then try again.",
+  mediaNetworkError:
+    "Audio loading failed. Check the server connection and try again.",
+  mediaPlaybackBlocked: "The browser blocked playback. Tap Play to try again.",
   clientSettings: "Client settings",
   clientSettingsHint: "Saved only in this browser.",
   serverSettings: "Server settings",
@@ -260,6 +268,13 @@ export const en = {
 export type TextKey = keyof typeof en;
 export const zh: Record<TextKey, string> = {
   ...en,
+  mediaDiagnosticLabel: "音频请求诊断",
+  mediaDiagnosticNetwork:
+    "浏览器无法访问音频响应（网络、跨域、HTTPS 限制或请求超时）。",
+  mediaSourceError:
+    "浏览器无法加载此音频，请检查服务端连接和所选格式转换的输出格式，然后重试。",
+  mediaNetworkError: "音频加载失败，请检查服务端连接后重试。",
+  mediaPlaybackBlocked: "浏览器阻止了播放，请点击播放按钮重试。",
   clientSettings: "客户端设置",
   clientSettingsHint: "仅保存在当前浏览器。",
   serverSettings: "服务端设置",

@@ -148,6 +148,8 @@ Web Audio decodes the current track and preloads the next. Adjacent prepared tra
 
 Only current/next playback buffers are held; there is no offline cache or service worker. Pause releases audio resources while retaining queue and position. Browser restoration starts paused. A still-playing remote output is synchronized from the server instead of overwritten by stale browser storage.
 
+iPhone and iPad playback uses a reusable HTML audio element connected through the ReplayGain audio graph, including for smaller files. Pausing retains that element and its source for resuming. Where supported, the player requests an Audio Session of type `playback` and supplies Media Session metadata, artwork, position and transport handlers for system controls. This mobile path does not guarantee sample-accurate gapless transitions. Silent-switch behavior, lock-screen controls and background track advancement still require verification on the target iOS/Safari version.
+
 Listening time is accumulated from actual audio advancement, excluding pauses and seeks. A new track or repeat cycle starts a new idempotent session. Lyric timestamps follow seeking; sidecar and embedded lyrics are provided by the server.
 
 Sleep deadlines use wall-clock time, so pausing does not extend them. Finish-current-track takes priority over repeat, and manually choosing another track cancels an end-of-track timer. Browser sleep timers require the page to remain running; independent AirPlay timers are owned by the server.
