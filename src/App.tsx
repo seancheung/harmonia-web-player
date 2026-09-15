@@ -955,7 +955,7 @@ function Browse({
           <div className="error-banner">
             <Info size={18} />
             <span>
-              {t("offline")}: {error}
+              {t("offline")}: {t(error as TextKey) || error}
             </span>
             <button type="button" onClick={() => void reload()}>
               {t("retry")}

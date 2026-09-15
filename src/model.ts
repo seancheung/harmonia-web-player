@@ -140,12 +140,31 @@ export async function api<T>(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+  const invalidResponse = p.api
+    ? "apiInvalidResponse"
+    : "apiServerUnconfigured";
+  if (res.headers?.get("Content-Type")?.includes("text/html"))
+    throw new Error(invalidResponse);
+  const data = await res.json().catch(() => {
+    throw new Error(invalidResponse);
+  });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error(err.error || res.statusText);
+    throw new Error(data?.error || `HTTP ${res.status}`);
   }
-  return res.json();
+  return data;
 }
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const unit = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
+  const index = Math.max(0, unit);
+  const value = bytes / 1024 ** index;
+  return `${Number(value.toFixed(index === 0 ? 0 : 2))} ${units[index]}`;
+}
+
 export function mediaURL(
   t: Track,
   type = "stream",

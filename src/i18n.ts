@@ -199,6 +199,10 @@ export const en = {
   stop: "Stop",
   connection: "Server connection",
   serverURL: "Server URL (empty = same origin)",
+  apiServerUnconfigured:
+    "No server API is available at this address. Set the server URL in Settings → Server connection, or configure a same-origin API proxy.",
+  apiInvalidResponse:
+    "The server returned an invalid API response. Check the server URL and reverse proxy configuration in Settings → Server connection.",
   token: "Access token",
   connect: "Save and connect",
   error: "Something went wrong",
@@ -463,6 +467,10 @@ export const zh: Record<TextKey, string> = {
   stop: "停止",
   connection: "连接服务端",
   serverURL: "服务端地址（留空使用同源）",
+  apiServerUnconfigured:
+    "当前地址未提供服务端接口。请在设置 → 连接服务端中填写服务端地址，或配置同源 API 代理。",
+  apiInvalidResponse:
+    "服务端返回的接口数据无效。请在设置 → 连接服务端中检查服务端地址及反向代理配置。",
   token: "访问令牌",
   connect: "保存并连接",
   error: "操作未完成",

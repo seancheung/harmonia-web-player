@@ -118,7 +118,7 @@ export function HomePage() {
           <p role="status">{t("loadingLibrary")}</p>
         ) : error ? (
           <div role="alert">
-            <p>{error}</p>
+            <p>{t(error as TextKey) || error}</p>
             <button
               type="button"
               className="secondary"

@@ -73,7 +73,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await reload();
       return true;
     } catch (e) {
-      setToast(e instanceof Error ? e.message : t("error"));
+      setToast(
+        e instanceof Error ? t(e.message as TextKey) || e.message : t("error"),
+      );
       return false;
     }
   }

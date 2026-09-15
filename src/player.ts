@@ -868,6 +868,7 @@ export class Player {
           error: "",
           mediaDiagnostics: undefined,
         });
+        await this.syncRemote(true);
         this.persist();
         return;
       }
@@ -889,10 +890,6 @@ export class Player {
       });
       await this.remote({ action: "repeat", repeat: transfer.repeat });
       await this.remote({ action: "shuffle", shuffle: transfer.shuffle });
-      await this.remote({
-        action: "volume",
-        volume: Math.round(transfer.volume * 100),
-      });
       await this.remote({
         action: "timer",
         deadline: transfer.deadline,

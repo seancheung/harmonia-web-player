@@ -89,9 +89,50 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("player behavior", () => {
+  it.each([false, true])(
+    "retains device volume when selecting outputs (queued: %s)",
+    async (queued) => {
+      const commands: Record<string, unknown>[] = [];
+      vi.mocked(fetch).mockImplementation(async (_url, options) => {
+        if (options?.method === "POST")
+          commands.push(JSON.parse(String(options.body)));
+        return {
+          ok: true,
+          json: async () =>
+            options?.method === "POST"
+              ? { ok: true }
+              : {
+                  configured: true,
+                  player: { state: "pause", volume: 23 },
+                  index: 0,
+                  deadline: 0,
+                  waiting: false,
+                  finish: false,
+                  error: "",
+                },
+        } as Response;
+      });
+      const p = new Player();
+      p.state = {
+        ...p.state,
+        volume: 0.75,
+        queue: queued ? [track("one")] : [],
+      };
+      await p.startRemote(["speaker"]);
+      expect(p.state.remote).toBe(true);
+      expect(p.state.volume).toBe(0.23);
+      expect(commands.some((command) => command.action === "volume")).toBe(
+        false,
+      );
+      p.volume(0.4);
+      await flush();
+      expect(commands).toContainEqual({ action: "volume", volume: 40 });
+    },
+  );
   it("selects remote outputs before a song and sends later playback to them", async () => {
     const p = new Player();
     const remote = vi.spyOn(p, "remote").mockResolvedValue(undefined);
+    vi.spyOn(p, "syncRemote").mockResolvedValue(undefined);
     await p.startRemote(["speaker"]);
     expect(remote.mock.calls).toEqual([
       [{ action: "outputs", outputs: ["speaker"] }],

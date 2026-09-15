@@ -16,6 +16,7 @@ import {
   api,
   type Conversion,
   defaults,
+  formatBytes,
   type RuleSet,
   type Source,
 } from "./model";
@@ -460,7 +461,7 @@ export function SettingsPage() {
               />
             </div>
             <p>
-              {((cache?.used || 0) / 1024 ** 3).toFixed(3)} GB /{" "}
+              {formatBytes(cache?.used || 0)} /{" "}
               {((cache?.limit || 0) / 1024 ** 3).toFixed(2)} GB{" "}
               {cache?.pending ? ` · ${t("pending")}: ${cache.pending}` : ""}
             </p>
