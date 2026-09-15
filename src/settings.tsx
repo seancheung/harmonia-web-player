@@ -415,7 +415,20 @@ export function SettingsPage() {
             {scan && (
               <div className="scan-status">
                 {scan.running && (
-                  <progress value={scan.processed} max={scan.total || 1} />
+                  <div
+                    className="cache-meter"
+                    role="progressbar"
+                    aria-label={t("scanning")}
+                    aria-valuemin={0}
+                    aria-valuemax={scan.total || 1}
+                    aria-valuenow={Math.min(scan.processed, scan.total || 1)}
+                  >
+                    <div
+                      style={{
+                        width: `${scan.total ? Math.min(100, Math.max(0, (scan.processed / scan.total) * 100)) : 0}%`,
+                      }}
+                    />
+                  </div>
                 )}
                 <span>
                   {scan.running

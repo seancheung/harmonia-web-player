@@ -1748,13 +1748,6 @@ p {
   color: var(--muted);
   font-size: 11px;
 }
-.scan-status progress {
-  width: 100%;
-  height: 5px;
-  accent-color: var(--accent);
-  display: block;
-  margin-bottom: 10px;
-}
 .color-field {
   display: flex;
   align-items: center;
