@@ -63,7 +63,7 @@ import {
   type Rule,
   save,
   sortTracks,
-  splitMembers,
+  splitMembers as splitTagMembers,
   type Track,
 } from "./model";
 import { player } from "./player";
@@ -358,6 +358,8 @@ function Browse({
   preset?: string;
 }) {
   const { t, lib, error, busy, reload, run, notice } = useApp();
+  const splitMembers = (text: string) =>
+    splitTagMembers(text, lib.tagSeparators || "");
   const [view, setView] = useState<ViewPrefs>(() => ({
     ...load<ViewPrefs>(`view.${section}`, {
       grid: ["albums", "artists"].includes(section),

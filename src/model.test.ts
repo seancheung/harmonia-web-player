@@ -6,8 +6,16 @@ import {
   matches,
   replayGain,
   sortTracks,
+  splitMembers,
   type Track,
 } from "./model";
+
+it("splits configured literal separators while preserving semicolons", () => {
+  expect(splitMembers("Rock/Pop; Jazz", "/")).toEqual(["Rock", "Pop", "Jazz"]);
+  expect(splitMembers("AC/DC; Rock")).toEqual(["AC/DC", "Rock"]);
+  expect(splitMembers("A/B、C; A", "/、")).toEqual(["A", "B", "C"]);
+  expect(splitMembers("A]B-C", "]-")).toEqual(["A", "B", "C"]);
+});
 
 const track = (patch: Partial<Track>): Track =>
   ({

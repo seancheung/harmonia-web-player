@@ -199,6 +199,10 @@ export const en = {
   stop: "Stop",
   connection: "Server connection",
   serverURL: "Server URL (empty = same origin)",
+  tagSeparators: "Tag parsing",
+  extraSeparators: "Additional separators",
+  tagSeparatorsHint:
+    "Semicolons are always supported. Enter extra separator characters, such as / or /、. Applies to artists, album artists and genres across clients after reloading the library. Saving updates album groups without changing music files. Names such as AC/DC will also be split.",
   apiServerUnconfigured:
     "No server API is available at this address. Set the server URL in Settings → Server connection, or configure a same-origin API proxy.",
   apiInvalidResponse:
@@ -467,6 +471,10 @@ export const zh: Record<TextKey, string> = {
   stop: "停止",
   connection: "连接服务端",
   serverURL: "服务端地址（留空使用同源）",
+  tagSeparators: "标签解析",
+  extraSeparators: "额外分隔符",
+  tagSeparatorsHint:
+    "始终支持分号。可输入额外分隔字符，如 / 或 /、，用于艺术家、专辑艺术家和流派，各客户端重新加载音乐库后生效。保存后更新专辑分组，不修改音乐文件。AC/DC 等包含分隔符的名称也会被拆分。",
   apiServerUnconfigured:
     "当前地址未提供服务端接口。请在设置 → 连接服务端中填写服务端地址，或配置同源 API 代理。",
   apiInvalidResponse:

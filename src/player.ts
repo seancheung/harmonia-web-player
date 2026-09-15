@@ -129,7 +129,12 @@ export class Player {
         // Lyrics are fetched separately; the library restores complete tags.
         save(
           "playback.queue",
-          queue.map((track) => ({ ...track, lyrics: "", tags: {} })),
+          queue.map((track) => ({
+            ...track,
+            lyrics: "",
+            tags: {},
+            tagValues: undefined,
+          })),
         );
         this.savedQueue = queue;
       }

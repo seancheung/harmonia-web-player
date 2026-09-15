@@ -4,11 +4,13 @@ import { useMemo } from "react";
 import { Cover, IconButton } from "./components";
 import { useApp } from "./context";
 import type { TextKey } from "./i18n";
-import { splitMembers, type Track } from "./model";
+import { splitMembers as splitTagMembers, type Track } from "./model";
 import { player } from "./player";
 
 export function HomePage() {
   const { lib, t, busy, error, reload } = useApp();
+  const splitMembers = (text: string) =>
+    splitTagMembers(text, lib.tagSeparators || "");
   const tracks = lib.tracks.filter((track) => !track.missing);
   const unheard = useMemo(() => {
     const candidates = lib.tracks.filter(

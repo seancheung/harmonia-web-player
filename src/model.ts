@@ -41,6 +41,7 @@ export interface Track {
   artworkRevision?: string;
   lyrics: string;
   tags: Record<string, string>;
+  tagValues?: Record<string, string[]>;
   trackGain: number | null;
   albumGain: number | null;
   trackPeak: number | null;
@@ -86,6 +87,7 @@ export interface Library {
   playlists: Playlist[];
   ruleSets: RuleSet[];
   cacheLimit: number;
+  tagSeparators?: string;
 }
 export interface Preferences {
   language: "en" | "zh";
@@ -179,9 +181,10 @@ export function mediaURL(
   });
   return `${p.api}/api/tracks/${t.id}/${type}?${q}`;
 }
-export const splitMembers = (text: string) => [
+export const splitMembers = (text: string, extra = "") => [
   ...new Set(
-    text
+    Array.from(text, (char) => (extra.includes(char) ? ";" : char))
+      .join("")
       .split(";")
       .map((s) => s.trim())
       .filter(Boolean),

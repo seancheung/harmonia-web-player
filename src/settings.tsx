@@ -60,6 +60,11 @@ export function SettingsPage() {
   const [scan, setScan] = useState<Scan>();
   const [cache, setCache] = useState<Cache>();
   const [limit, setLimit] = useState(5);
+  const [tagSeparators, setTagSeparators] = useState(lib.tagSeparators || "");
+  useEffect(
+    () => setTagSeparators(lib.tagSeparators || ""),
+    [lib.tagSeparators],
+  );
   const [caps, setCaps] = useState<Capabilities>({
     formats: [],
     outputs: [],
@@ -450,6 +455,33 @@ export function SettingsPage() {
                 </IconButton>
               </div>
             ))}
+          </section>
+          <section className="settings-section">
+            <h3>{t("tagSeparators")}</h3>
+            <label>
+              {t("extraSeparators")}
+              <input
+                value={tagSeparators}
+                maxLength={16}
+                placeholder="/"
+                onChange={(e) => setTagSeparators(e.target.value)}
+              />
+            </label>
+            <p className="help">{t("tagSeparatorsHint")}</p>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() =>
+                void run(async () => {
+                  await api("/tag-settings", "PUT", {
+                    separators: tagSeparators,
+                  });
+                  notice(t("saved"));
+                })
+              }
+            >
+              {t("save")}
+            </button>
           </section>
           <section className="settings-section">
             <h3>{t("cache")}</h3>

@@ -176,3 +176,10 @@ Library metadata is bootstrapped as a complete snapshot and grouped/paged in the
 GitHub Actions runs `npm ci`, Biome, unit tests, production build and a Docker build entirely from this repository. CI uploads `dist` as an artifact. Pushes to `main` and `v*` tags also publish multi-platform images to `ghcr.io/seancheung/harmonia-web-player`; pull requests only build and test. Publishing an image does not deploy a running site.
 
 Browser FLAC playback and the source/scan/browse flow can be checked against the server's Docker image without personal music. Physical AirPlay devices, PIN pairing, multiroom synchronization and transport-specific gapless playback require a configured OwnTone instance and actual target speakers. Unavailable devices are reported explicitly.
+
+
+### Native multi-value tags
+
+The server preserves repeated Vorbis Comment fields in native FLAC and Ogg Vorbis/Opus files, and null-separated ID3v2.4 text values in MP3 files. Values are exposed as arrays in `tagValues`; existing text fields remain available as semicolon-separated display values for compatible grouping, search and clients. Artist, album artist and genre values are split first at native boundaries, then at semicolons and any extra characters configured in server settings. A slash inside a native value is preserved unless `/` is configured.
+
+The next ordinary library scan rereads metadata created by older versions once, preserving track IDs, favorites and play counts. Music files are not modified. Other tag formats continue to use ffprobe metadata; encrypted ID3 text frames or malformed native metadata produce a scan error and retain the previous library entry. Native metadata reads are bounded to 64 MiB.
