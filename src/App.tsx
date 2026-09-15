@@ -420,7 +420,7 @@ function Browse({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState<Track[]>();
   const [details, setDetails] = useState<Track>();
-  const [artistAlbums, setArtistAlbums] = useState(false);
+  const [detailAlbums, setDetailAlbums] = useState(false);
   const playback = useSyncExternalStore(player.subscribe, player.snapshot);
   const playlist = lib.playlists.find((p) => p.id === detail);
   const updateView = (patch: Partial<ViewPrefs>) => {
@@ -516,14 +516,14 @@ function Browse({
   );
   if (rule) tracks = tracks.filter((t) => matches(t, rule));
   const manual = section === "playlists" && !!detail && !playlist?.smart;
+  const supportsAlbumView = !!detail && ["artists", "genres"].includes(section);
   const groupMode =
     (!detail &&
       ["albums", "artists", "genres", "playlists", "folders"].includes(
         section,
       )) ||
-    (section === "artists" && !!detail && artistAlbums);
-  const groupType =
-    artistAlbums && section === "artists" && detail ? "albums" : section;
+    (supportsAlbumView && detailAlbums);
+  const groupType = detailAlbums && supportsAlbumView ? "albums" : section;
   const sortFields =
     section === "folders"
       ? ["filename", "modifiedAt", "createdAt"]
@@ -997,13 +997,13 @@ function Browse({
             </div>
           )}
 
-          {section === "artists" && detail && (
+          {supportsAlbumView && (
             <div className="view-toggle">
               <IconButton
                 label={t("albumView")}
-                active={artistAlbums}
+                active={detailAlbums}
                 onClick={() => {
-                  setArtistAlbums(true);
+                  setDetailAlbums(true);
                   setPage(1);
                 }}
               >
@@ -1011,9 +1011,9 @@ function Browse({
               </IconButton>
               <IconButton
                 label={t("songView")}
-                active={!artistAlbums}
+                active={!detailAlbums}
                 onClick={() => {
-                  setArtistAlbums(false);
+                  setDetailAlbums(false);
                   setPage(1);
                 }}
               >
