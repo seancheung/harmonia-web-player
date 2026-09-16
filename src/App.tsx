@@ -257,67 +257,89 @@ function PlaylistDialog({
   const [smartRule, setSmartRule] = useState(rule || existing?.rule);
   const [field, setField] = useState(existing?.sort || sort);
   const [direction, setDirection] = useState(existing?.desc ?? desc);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   return (
     <Modal
       title={existing ? t("edit") : rule ? t("saveSmart") : t("newPlaylist")}
-      close={close}
+      close={() => {
+        if (!savingRef.current) close();
+      }}
     >
       <form
+        aria-busy={saving}
         onSubmit={async (e) => {
           e.preventDefault();
+          if (savingRef.current) return;
           if (smartRule && !validateRule(smartRule)) {
             notice(t("ruleInvalid"));
             return;
           }
-          if (
-            await run(() =>
-              api(
-                `/playlists${existing ? `/${existing.id}` : ""}`,
-                existing ? "PUT" : "POST",
-                {
-                  name,
-                  smart: !!smartRule,
-                  rule: smartRule,
-                  sort: field,
-                  desc: direction,
-                },
-              ),
-            )
-          )
-            close();
+          savingRef.current = true;
+          setSaving(true);
+          try {
+            if (
+              await run(() =>
+                api(
+                  `/playlists${existing ? `/${existing.id}` : ""}`,
+                  existing ? "PUT" : "POST",
+                  {
+                    name,
+                    smart: !!smartRule,
+                    rule: smartRule,
+                    sort: field,
+                    desc: direction,
+                  },
+                ),
+              )
+            ) {
+              notice(t("saved"));
+              close();
+            }
+          } finally {
+            savingRef.current = false;
+            setSaving(false);
+          }
         }}
       >
-        <label>
-          {t("name")}
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        {smartRule && (
-          <>
-            <RuleEditor rule={smartRule} onChange={setSmartRule} />
-            <SortControl
-              field={field}
-              desc={direction}
-              fields={songSort}
-              onChange={(s, d) => {
-                setField(s);
-                setDirection(d);
-              }}
+        <fieldset disabled={saving} style={{ display: "contents" }}>
+          <label>
+            {t("name")}
+            <input
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
             />
-          </>
-        )}
-        <footer>
-          <button type="button" className="secondary" onClick={close}>
-            {t("cancel")}
-          </button>
-          <button className="primary" type="submit">
-            {t("save")}
-          </button>
-        </footer>
+          </label>
+          {smartRule && (
+            <>
+              <RuleEditor rule={smartRule} onChange={setSmartRule} />
+              <SortControl
+                field={field}
+                desc={direction}
+                fields={songSort}
+                onChange={(s, d) => {
+                  setField(s);
+                  setDirection(d);
+                }}
+              />
+            </>
+          )}
+          <footer>
+            <button type="button" className="secondary" onClick={close}>
+              {t("cancel")}
+            </button>
+            <button className="primary" type="submit">
+              {t(saving ? "saving" : "save")}
+            </button>
+          </footer>
+        </fieldset>
       </form>
+      {saving && (
+        <p className="help" role="status">
+          {t("playlistSaving")}
+        </p>
+      )}
     </Modal>
   );
 }

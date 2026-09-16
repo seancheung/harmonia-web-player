@@ -249,6 +249,9 @@ export const en = {
   dismissError: "Dismiss error",
   retry: "Retry",
   saved: "Saved",
+  saving: "Saving…",
+  playlistSaving:
+    "Saving the playlist and refreshing the library. Please wait…",
   sleep: "Sleep timer",
   minutes: "minutes",
   custom: "Custom minutes",
@@ -561,6 +564,8 @@ export const zh: Record<TextKey, string> = {
   dismissError: "关闭错误提示",
   retry: "重试",
   saved: "已保存",
+  saving: "正在保存…",
+  playlistSaving: "正在保存播放列表并刷新音乐库，请稍候…",
   sleep: "睡眠定时器",
   minutes: "分钟",
   custom: "自定义分钟数",
