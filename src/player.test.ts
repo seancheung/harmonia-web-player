@@ -333,6 +333,72 @@ describe("player behavior", () => {
       "queueVersion=version-1",
     );
   });
+  it("keeps the chosen repeat mode while its command is pending", async () => {
+    const p = new Player();
+    p.state.remote = true;
+    p.state.repeat = "off";
+    let finish!: () => void;
+    vi.spyOn(p, "remote").mockImplementation(
+      () =>
+        new Promise<undefined>((resolve) => {
+          finish = () => resolve(undefined);
+        }),
+    );
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        configured: true,
+        player: { state: "play", repeat: "off" },
+        index: 0,
+      }),
+    } as Response);
+    p.repeat();
+    await Promise.resolve();
+    await p.syncRemote();
+    expect(p.state.repeat).toBe("all");
+    finish();
+    await flush();
+  });
+  it("updates progress and enables controls before queue submission completes", async () => {
+    const p = new Player();
+    p.state.remote = true;
+    p.state.loading = true;
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        configured: true,
+        player: { state: "play", item_progress_ms: 12500 },
+        index: 0,
+      }),
+    } as Response);
+    await p.syncRemote();
+    expect(p.state.position).toBe(12.5);
+    expect(p.state.playing).toBe(true);
+    expect(p.state.loading).toBe(false);
+  });
+  it("does not finish an obsolete start after the remote queue is cleared", async () => {
+    const p = new Player();
+    p.state.remote = true;
+    p.state.queue = [track("one")];
+    let finish!: () => void;
+    const remote = vi.spyOn(p, "remote").mockImplementation(async (body) => {
+      if ((body as { action: string }).action === "start") {
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+      }
+      return {};
+    });
+    const starting = p.startRemote();
+    await Promise.resolve();
+    p.clear();
+    finish();
+    await starting;
+    expect(
+      remote.mock.calls.map(([body]) => (body as { action: string }).action),
+    ).toEqual(["repeat", "start", "clear"]);
+    expect(p.state.loading).toBe(false);
+  });
   it("seeks repeatedly with replay gain without refetching or reverting position", async () => {
     save("preferences", { ...defaults, gain: "track", preamp: 2 });
     const p = new Player();

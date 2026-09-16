@@ -501,7 +501,11 @@ function Browse({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState<Track[]>();
   const [details, setDetails] = useState<Track>();
-  const [detailAlbums, setDetailAlbums] = useState(false);
+  const [detailAlbums, setDetailAlbums] = useState(
+    section === "artists" || section === "genres",
+  );
+  const [selectedDisc, setSelectedDisc] = useState<number | null>(null);
+  useEffect(() => setSelectedDisc(null), [detail]);
   const playback = useSyncExternalStore(player.subscribe, player.snapshot);
   const playlist = lib.playlists.find((p) => p.id === detail);
   const updateView = (patch: Partial<ViewPrefs>) => {
@@ -586,6 +590,19 @@ function Browse({
       });
     }
   }
+  const isAlbumDetail = section === "albums" && !!detail;
+  const albumDiscs = isAlbumDetail
+    ? [...new Set(tracks.map((track) => track.disc || 1))].sort((a, b) => a - b)
+    : [];
+  const activeDisc =
+    albumDiscs.length > 1 &&
+    selectedDisc !== null &&
+    albumDiscs.includes(selectedDisc)
+      ? selectedDisc
+      : null;
+  if (activeDisc !== null)
+    tracks = tracks.filter((track) => (track.disc || 1) === activeDisc);
+  const showDiscNumber = albumDiscs.length > 1 && activeDisc === null;
   const searchText = search.toLowerCase();
   tracks = tracks.filter(
     (t) =>
@@ -1099,6 +1116,28 @@ function Browse({
             </div>
           )}
 
+          {albumDiscs.length > 1 && (
+            <fieldset
+              className="view-toggle disc-toggle"
+              aria-label={t("disc")}
+            >
+              {[null, ...albumDiscs].map((disc) => (
+                <button
+                  key={disc ?? "all"}
+                  type="button"
+                  className={activeDisc === disc ? "active" : ""}
+                  aria-pressed={activeDisc === disc}
+                  onClick={() => {
+                    setSelectedDisc(disc);
+                    setPage(1);
+                    setSelected(new Set());
+                  }}
+                >
+                  {disc === null ? t("allDiscs") : `CD ${disc}`}
+                </button>
+              ))}
+            </fieldset>
+          )}
           {supportsAlbumView && (
             <div className="view-toggle">
               <IconButton
@@ -1451,7 +1490,11 @@ function Browse({
                 <div className="song-table-header">
                   <span>#</span>
                   <span>{t("title")}</span>
-                  <span>{t("album")}</span>
+                  <span>
+                    {isAlbumDetail
+                      ? `${t("number")}${showDiscNumber ? ` / ${t("disc")}` : ""}`
+                      : t("album")}
+                  </span>
                   <span>{t("year")}</span>
                   <span>{t("duration")}</span>
                   {songColumns
@@ -1540,12 +1583,19 @@ function Browse({
                       </div>
                     </div>
                   </div>
-                  <Link
-                    {...link("albums", track.albumId)}
-                    className="song-album"
-                  >
-                    {track.album || t("unknownAlbum")}
-                  </Link>
+                  {isAlbumDetail ? (
+                    <span className="song-album song-track-number">
+                      # {track.number || "—"}
+                      {showDiscNumber && ` · CD ${track.disc || 1}`}
+                    </span>
+                  ) : (
+                    <Link
+                      {...link("albums", track.albumId)}
+                      className="song-album"
+                    >
+                      {track.album || t("unknownAlbum")}
+                    </Link>
+                  )}
                   <span className="song-year">{track.year || "—"}</span>
                   <span className="song-duration">
                     {duration(track.duration)}

@@ -90,6 +90,9 @@ export class Player {
   private audioPreferences = "";
   private savedQueue: Track[] | null = null;
   private remoteVersion = "";
+  private remoteStartVersion = 0;
+  private repeatPending = 0;
+  private repeatCommands: Promise<void> = Promise.resolve();
   private lastRemoteError = "";
   private remoteSync: Promise<void> | null = null;
   constructor() {
@@ -688,8 +691,18 @@ export class Player {
       this.state.repeat
     ];
     this.emit({ repeat });
-    if (this.state.remote) void this.remote({ action: "repeat", repeat });
-    else void this.preload();
+    if (this.state.remote) {
+      this.repeatPending++;
+      this.repeatCommands = this.repeatCommands
+        .then(async () => {
+          await this.remote({ action: "repeat", repeat });
+        })
+        .catch(() => {})
+        .finally(() => {
+          this.repeatPending--;
+          if (!this.repeatPending) void this.syncRemote(true);
+        });
+    } else void this.preload();
     this.persist();
   }
   shuffle() {
@@ -757,6 +770,8 @@ export class Player {
   }
   clear() {
     if (this.state.remote) {
+      this.remoteStartVersion++;
+      this.emit({ loading: false });
       void this.remote({ action: "clear" }).catch(() => {});
       return;
     }
@@ -854,10 +869,15 @@ export class Player {
         });
     }
   }
-  async remote(body: unknown) {
+  async remote(body: unknown): Promise<{ cancelled?: boolean } | undefined> {
     try {
-      await api("/remote", "POST", body);
+      const result = await api<{ cancelled?: boolean }>(
+        "/remote",
+        "POST",
+        body,
+      );
       await this.syncRemote(true);
+      return result;
     } catch (e) {
       this.remoteVersion = "";
       await this.syncRemote(true);
@@ -866,6 +886,7 @@ export class Player {
     }
   }
   async startRemote(outputs?: string[]) {
+    const startVersion = ++this.remoteStartVersion;
     const transfer = { ...this.state };
     this.dispose();
     this.emit({ playing: false, loading: true });
@@ -883,7 +904,10 @@ export class Player {
         return;
       }
       const p = this.prefs();
-      await this.remote({
+      await this.remote({ action: "repeat", repeat: this.state.repeat });
+      if (startVersion !== this.remoteStartVersion) return;
+      this.emit({ remote: true });
+      const result = await this.remote({
         action: "start",
         position: Math.round(transfer.position * 1000),
         ids: transfer.queue.map((t) => t.id),
@@ -894,8 +918,8 @@ export class Player {
         preamp: p.preamp,
         protect: p.protect,
       });
+      if (startVersion !== this.remoteStartVersion || result?.cancelled) return;
       this.emit({ remote: true, loading: false });
-      await this.remote({ action: "repeat", repeat: transfer.repeat });
       await this.remote({ action: "shuffle", shuffle: transfer.shuffle });
       await this.remote({
         action: "timer",
@@ -908,6 +932,7 @@ export class Player {
     }
   }
   async local() {
+    this.remoteStartVersion++;
     const transfer = { ...this.state };
     try {
       await this.remote({ action: "local" });
@@ -972,9 +997,12 @@ export class Player {
       }
       this.emit({
         ...(s.queue ? { queue: s.queue } : {}),
+        ...(s.player.state === "play" ? { loading: false } : {}),
         index: s.index,
         gainContext: s.gainContext === "album" ? "album" : "track",
-        repeat: s.player.repeat ?? this.state.repeat,
+        repeat: this.repeatPending
+          ? this.state.repeat
+          : (s.player.repeat ?? this.state.repeat),
         shuffle: s.player.shuffle ?? this.state.shuffle,
         volume:
           s.player.volume !== undefined
