@@ -348,7 +348,7 @@ export function validateRule(rule: Rule) {
         r.rules.every((c) => walk(c, depth + (c.mode ? 1 : 0)))
       );
     if (!r.field || !r.op) return false;
-    if (r.field === "folder") return !!r.sourceId;
+
     if (
       [
         "year",
@@ -376,7 +376,7 @@ export function RuleEditor({
   onChange: (r: Rule) => void;
   depth?: number;
 }) {
-  const { t, lib } = useApp();
+  const { t } = useApp();
   const fields = [
     "title",
     "artist",
@@ -388,7 +388,7 @@ export function RuleEditor({
     "favorite",
     "playCount",
     "addedAt",
-    "folder",
+    "path",
     "disc",
     "number",
     "bitrate",
@@ -398,6 +398,7 @@ export function RuleEditor({
     "key",
     "tag",
   ];
+
   if (rule.mode)
     return (
       <div className="rule-group">
@@ -485,26 +486,6 @@ export function RuleEditor({
     "sampleRate",
     "bpm",
   ].includes(rule.field || "");
-  const folderOptions = lib.sources.flatMap((s) =>
-    [
-      "",
-      ...new Set(
-        lib.tracks
-          .filter((t) => !t.missing && t.sourceId === s.id)
-          .flatMap((t) => {
-            const parts = t.folder.split("/").filter(Boolean);
-            return parts.map((_, i) => parts.slice(0, i + 1).join("/"));
-          }),
-      ),
-    ].map((path) => ({
-      source: s.id,
-      path,
-      label: `${s.name} / ${path || "/"}`,
-    })),
-  );
-  const folderValid = folderOptions.some(
-    (o) => o.source === rule.sourceId && o.path === rule.value,
-  );
   return (
     <div className="rule-condition">
       <Select
@@ -543,7 +524,7 @@ export function RuleEditor({
         value={rule.op}
         onChange={(e) => onChange({ ...rule, op: e.target.value })}
       >
-        {(rule.field === "folder" || rule.field === "favorite"
+        {(rule.field === "favorite"
           ? ["eq", "ne"]
           : numeric
             ? ["eq", "ne", "gt", "gte", "lt", "lte"]
@@ -554,57 +535,15 @@ export function RuleEditor({
           </SelectOption>
         ))}
       </Select>
-      {rule.field === "folder" ? (
-        <>
-          <Select
-            aria-label={t("folder")}
-            value={`${rule.sourceId || ""}|${rule.value || ""}`}
-            onChange={(e) => {
-              const [sourceId, ...path] = e.target.value.split("|");
-              onChange({ ...rule, sourceId, value: path.join("|") });
-            }}
-          >
-            <SelectOption value="|">{t("select")}</SelectOption>
-            {!folderValid && rule.sourceId && (
-              <SelectOption value={`${rule.sourceId}|${rule.value}`}>
-                {t("folderGone")} {rule.value}
-              </SelectOption>
-            )}
-            {folderOptions.map((o) => (
-              <SelectOption
-                key={`${o.source}|${o.path}`}
-                value={`${o.source}|${o.path}`}
-              >
-                {o.label}
-              </SelectOption>
-            ))}
-          </Select>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={!!rule.recursive}
-              onChange={(e) =>
-                onChange({ ...rule, recursive: e.target.checked })
-              }
-            />
-            {t("recursive")}
-          </label>
-          {!folderValid && rule.sourceId && (
-            <small className="error-text">
-              {lib.sources.find((s) => s.id === rule.sourceId)?.error ||
-                t("folderGone")}
-            </small>
-          )}
-        </>
-      ) : rule.field === "favorite" ? (
+      {rule.field === "favorite" ? (
         <Select
           value={String(rule.value)}
           onChange={(e) =>
             onChange({ ...rule, value: e.target.value === "true" })
           }
         >
-          <SelectOption value="true">{t("favorite")}</SelectOption>
-          <SelectOption value="false">{t("off")}</SelectOption>
+          <SelectOption value="true">{t("yes")}</SelectOption>
+          <SelectOption value="false">{t("no")}</SelectOption>
         </Select>
       ) : (
         <>
@@ -618,7 +557,11 @@ export function RuleEditor({
             />
           )}
           <input
-            aria-label={t("fullText")}
+            aria-label={t(rule.field === "path" ? "path" : "fullText")}
+            placeholder={
+              rule.field === "path" ? t("pathFilterHint") : undefined
+            }
+            title={rule.field === "path" ? t("pathFilterHint") : undefined}
             type={
               rule.field === "addedAt"
                 ? "datetime-local"

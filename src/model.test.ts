@@ -57,23 +57,18 @@ describe("library rules", () => {
     expect(matches(track({ genre: "Jazz", year: 2019 }), rule)).toBe(false);
     expect(matches(track({ favorite: true }), rule)).toBe(true);
   });
-  it("matches complete folder paths within their source", () => {
-    const rule = {
-      field: "folder",
-      op: "eq",
-      value: "Jazz",
-      sourceId: "s",
-      recursive: true,
-    };
-    expect(matches(track({ sourceId: "s", folder: "Jazz/Live" }), rule)).toBe(
-      true,
-    );
-    expect(matches(track({ sourceId: "s", folder: "Jazz Live" }), rule)).toBe(
-      false,
-    );
-    expect(matches(track({ sourceId: "other", folder: "Jazz" }), rule)).toBe(
-      false,
-    );
+  it("matches file paths with text operators and normalized separators", () => {
+    const song = track({ path: "Albums/Jazz/01.flac" });
+    for (const [op, value, expected] of [
+      ["contains", "jazz\\01", true],
+      ["notContains", "Rock", true],
+      ["eq", "albums/jazz/01.flac", true],
+      ["ne", "Albums/Jazz", true],
+      ["eq", "Albums/Jazz", false],
+      ["notContains", "01.flac", false],
+    ] as const) {
+      expect(matches(song, { field: "path", op, value })).toBe(expected);
+    }
   });
   it("rejects empty groups and invalid numeric conditions", () => {
     expect(validateRule({ mode: "all", rules: [] })).toBe(false);

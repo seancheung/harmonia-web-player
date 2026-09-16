@@ -206,13 +206,23 @@ export function matches(t: Track, r: Rule): boolean {
       ? (r.rules || []).every((c) => matches(t, c))
       : (r.rules || []).some((c) => matches(t, c));
   }
-  if (r.field === "folder") {
-    const folder = String(r.value || "").replace(/^\/+|\/+$/g, "");
-    const inside =
-      t.sourceId === r.sourceId &&
-      (t.folder === folder ||
-        (r.recursive && (folder === "" || t.folder.startsWith(`${folder}/`))));
-    return r.op === "ne" ? !inside : !!inside;
+  if (r.field === "path") {
+    const path = (t.path || "").replace(/\\/g, "/").toLowerCase();
+    const query = String(r.value ?? "")
+      .replace(/\\/g, "/")
+      .toLowerCase();
+    switch (r.op) {
+      case "contains":
+        return path.includes(query);
+      case "notContains":
+        return !path.includes(query);
+      case "eq":
+        return path === query;
+      case "ne":
+        return path !== query;
+      default:
+        return false;
+    }
   }
   const actual =
     r.field === "bpm"
