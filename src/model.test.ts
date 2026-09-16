@@ -159,3 +159,21 @@ it("filters BPM aliases numerically, keys as text, and excludes text case-insens
     false,
   );
 });
+
+it("matches empty conditions without requiring a value", () => {
+  for (const [field, patch, empty] of [
+    ["genre", { genre: "  " }, true],
+    ["genre", { genre: "Jazz" }, false],
+    ["year", { year: 0 }, true],
+    ["playCount", { playCount: 0 }, false],
+    ["favorite", { favorite: false }, false],
+    ["path", { path: "" }, true],
+    ["bpm", { tags: {} }, true],
+    ["tag:comment", { tags: {} }, true],
+  ] as const) {
+    const rule = { field, op: "isEmpty" };
+    expect(validateRule(rule)).toBe(true);
+    expect(matches(track(patch), rule)).toBe(empty);
+    expect(matches(track(patch), { ...rule, op: "isNotEmpty" })).toBe(!empty);
+  }
+});

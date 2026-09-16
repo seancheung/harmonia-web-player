@@ -206,7 +206,7 @@ export function matches(t: Track, r: Rule): boolean {
       ? (r.rules || []).every((c) => matches(t, c))
       : (r.rules || []).some((c) => matches(t, c));
   }
-  if (r.field === "path") {
+  if (r.field === "path" && r.op !== "isEmpty" && r.op !== "isNotEmpty") {
     const path = (t.path || "").replace(/\\/g, "/").toLowerCase();
     const query = String(r.value ?? "")
       .replace(/\\/g, "/")
@@ -236,6 +236,13 @@ export function matches(t: Track, r: Rule): boolean {
         : r.field?.startsWith("tag:")
           ? t.tags?.[r.field.slice(4)]
           : (t as unknown as Record<string, unknown>)[r.field || ""];
+  if (r.op === "isEmpty" || r.op === "isNotEmpty") {
+    const empty =
+      actual == null ||
+      (typeof actual === "string" && actual.trim() === "") ||
+      (typeof actual === "number" && actual === 0 && r.field !== "playCount");
+    return r.op === "isEmpty" ? empty : !empty;
+  }
   if (r.field === "bpm" && actual === undefined) return r.op === "ne";
   const a = typeof actual === "string" ? actual.toLowerCase() : (actual ?? "");
   const b =

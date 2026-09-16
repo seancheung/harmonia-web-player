@@ -348,6 +348,8 @@ export function validateRule(rule: Rule) {
         r.rules.every((c) => walk(c, depth + (c.mode ? 1 : 0)))
       );
     if (!r.field || !r.op) return false;
+    if (r.field === "tag:") return false;
+    if (r.op === "isEmpty" || r.op === "isNotEmpty") return true;
 
     if (
       [
@@ -527,8 +529,8 @@ export function RuleEditor({
         {(rule.field === "favorite"
           ? ["eq", "ne"]
           : numeric
-            ? ["eq", "ne", "gt", "gte", "lt", "lte"]
-            : ["contains", "notContains", "eq", "ne"]
+            ? ["eq", "ne", "gt", "gte", "lt", "lte", "isEmpty", "isNotEmpty"]
+            : ["contains", "notContains", "eq", "ne", "isEmpty", "isNotEmpty"]
         ).map((op) => (
           <SelectOption key={op} value={op}>
             {t(op as TextKey)}
@@ -558,6 +560,7 @@ export function RuleEditor({
           )}
           <input
             aria-label={t(rule.field === "path" ? "path" : "fullText")}
+            hidden={rule.op === "isEmpty" || rule.op === "isNotEmpty"}
             placeholder={
               rule.field === "path" ? t("pathFilterHint") : undefined
             }
