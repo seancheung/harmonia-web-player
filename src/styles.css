@@ -202,6 +202,15 @@ p {
 .brand-dot {
   color: var(--accent);
 }
+.brand-mark {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  background-color: currentColor;
+  -webkit-mask: url("/logo.svg") center / contain no-repeat;
+  mask: url("/logo.svg") center / contain no-repeat;
+}
 .library-caption {
   font-size: 10px;
   font-weight: 700;

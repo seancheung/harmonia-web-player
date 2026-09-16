@@ -15,7 +15,6 @@ import {
   ArrowRightFromLine,
   ArrowUpNarrowWide,
   ArrowUpRight,
-  AudioLines,
   ChevronLeft,
   ChevronRight,
   Columns3,
@@ -142,7 +141,7 @@ function Shell() {
             style={{ display: "flex", alignItems: "center" }}
           >
             <span className="brand-icon">
-              <AudioLines size={24} />
+              <span className="brand-mark" aria-hidden="true" />
             </span>
             <span className="brand-name">
               harmonia<span className="brand-dot">.</span>
