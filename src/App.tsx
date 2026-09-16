@@ -94,7 +94,7 @@ const sections = [
   { id: "playlists", icon: ListMusic },
 ] as const;
 function Shell() {
-  const { t, lib } = useApp();
+  const { t } = useApp();
   const mainRef = useRef<HTMLElement>(null);
   useEffect(() => {
     let compactHeader = false;
@@ -161,11 +161,6 @@ function Shell() {
             >
               <Icon size={19} strokeWidth={1.8} />
               <span>{t(id)}</span>
-              {id === "favorites" && lib.tracks.some((t) => t.favorite) && (
-                <span className="nav-count">
-                  {lib.tracks.filter((t) => t.favorite).length}
-                </span>
-              )}
             </Link>
           ))}
         </nav>

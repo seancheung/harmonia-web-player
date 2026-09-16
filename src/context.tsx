@@ -5,6 +5,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { errorMessage } from "./errors";
 import { en, type TextKey, zh } from "./i18n";
 import {
   api,
@@ -20,7 +21,7 @@ interface Context {
   lib: Library;
   prefs: Preferences;
   setPrefs: (p: Partial<Preferences>) => void;
-  reload: () => Promise<void>;
+  reload: (throwOnError?: boolean) => Promise<void>;
   t: (key: TextKey) => string;
   notice: (text: string) => void;
   error: string;
@@ -49,20 +50,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(true);
   const t = (key: TextKey) => (prefs.language === "zh" ? zh : en)[key];
-  const setPrefs = (patch: Partial<Preferences>) =>
-    updatePrefs((old) => {
-      const next = { ...old, ...patch };
-      save("preferences", next);
-      return next;
-    });
-  async function reload() {
+  const setPrefs = (patch: Partial<Preferences>) => {
+    const next = { ...prefs, ...load("preferences", {}), ...patch };
+    save("preferences", next);
+    updatePrefs(next);
+  };
+  async function reload(throwOnError = false) {
     try {
       const data = await api<Library>("/library");
       setLib(data);
       player.reconcile(data.tracks);
       setError("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "error");
+      setError(errorMessage(e));
+      if (throwOnError) throw e;
     } finally {
       setBusy(false);
     }
@@ -73,9 +74,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await reload();
       return true;
     } catch (e) {
-      setToast(
-        e instanceof Error ? t(e.message as TextKey) || e.message : t("error"),
-      );
+      const message = errorMessage(e);
+      setToast(t(message as TextKey) || message);
       return false;
     }
   }

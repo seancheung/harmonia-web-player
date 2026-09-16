@@ -1,3 +1,4 @@
+import { errorMessage } from "./errors";
 import {
   api,
   defaults,
@@ -89,6 +90,7 @@ export class Player {
   private audioPreferences = "";
   private savedQueue: Track[] | null = null;
   private remoteVersion = "";
+  private lastRemoteError = "";
   private remoteSync: Promise<void> | null = null;
   constructor() {
     if (typeof window === "undefined") return;
@@ -114,6 +116,9 @@ export class Player {
     return () => this.listeners.delete(fn);
   };
   snapshot = () => this.state;
+  dismissError() {
+    this.emit({ error: "", mediaDiagnostics: undefined });
+  }
   private emit(patch: Partial<Playback> = {}) {
     this.state = { ...this.state, ...patch };
     this.systemMedia?.update(this.state);
@@ -856,7 +861,7 @@ export class Player {
     } catch (e) {
       this.remoteVersion = "";
       await this.syncRemote(true);
-      this.emit({ error: e instanceof Error ? e.message : "error" });
+      this.emit({ error: errorMessage(e) });
       throw e;
     }
   }
@@ -880,6 +885,7 @@ export class Player {
       const p = this.prefs();
       await this.remote({
         action: "start",
+        position: Math.round(transfer.position * 1000),
         ids: transfer.queue.map((t) => t.id),
         index: transfer.index,
         ruleSet: p.ruleSet,
@@ -889,10 +895,6 @@ export class Player {
         protect: p.protect,
       });
       this.emit({ remote: true, loading: false });
-      await this.remote({
-        action: "seek",
-        position: Math.round(transfer.position * 1000),
-      });
       await this.remote({ action: "repeat", repeat: transfer.repeat });
       await this.remote({ action: "shuffle", shuffle: transfer.shuffle });
       await this.remote({
@@ -983,12 +985,15 @@ export class Player {
         deadline: s.deadline,
         waiting: s.waiting,
         finish: s.finish,
-        error: s.error || this.state.error,
+        error:
+          s.error && s.error !== this.lastRemoteError
+            ? errorMessage(s.error)
+            : this.state.error,
       });
+      this.lastRemoteError = s.error || "";
       if (s.queueVersion) this.remoteVersion = s.queueVersion;
     } catch (e) {
-      if (this.state.remote)
-        this.emit({ error: e instanceof Error ? e.message : "error" });
+      if (this.state.remote) this.emit({ error: errorMessage(e) });
     }
   }
 }

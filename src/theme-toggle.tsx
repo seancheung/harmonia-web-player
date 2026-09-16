@@ -1,4 +1,4 @@
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Moon, Sun, SunMoon } from "lucide-react";
 import { useApp } from "./context";
 
 export function ThemeToggle() {
@@ -10,7 +10,7 @@ export function ThemeToggle() {
         ? "system"
         : "light";
   const Icon =
-    prefs.theme === "light" ? Sun : prefs.theme === "dark" ? Moon : Monitor;
+    prefs.theme === "light" ? Sun : prefs.theme === "dark" ? Moon : SunMoon;
   const label = `${t("theme")}: ${t(prefs.theme)} · ${t("switchToTheme")} ${t(next)}`;
   return (
     <button

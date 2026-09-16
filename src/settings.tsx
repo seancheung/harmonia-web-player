@@ -11,6 +11,7 @@ import { type CSSProperties, useEffect, useState } from "react";
 import { IconButton, Modal } from "./components";
 import { useApp } from "./context";
 import { DialogPresence } from "./dialog-presence";
+import { errorMessage } from "./errors";
 import type { TextKey } from "./i18n";
 import {
   api,
@@ -78,6 +79,21 @@ export function SettingsPage() {
   });
   const [url, setURL] = useState(prefs.api);
   const [token, setToken] = useState(prefs.token);
+  const [connecting, setConnecting] = useState(false);
+  async function connect() {
+    if (connecting) return;
+    setConnecting(true);
+    try {
+      setPrefs({ api: url.trim().replace(/\/$/, ""), token });
+      await Promise.all([reload(true), refresh()]);
+      notice(t("connected"));
+    } catch (error) {
+      const message = errorMessage(error);
+      notice(t(message as TextKey) || message);
+    } finally {
+      setConnecting(false);
+    }
+  }
   async function refresh() {
     await Promise.all([
       api<Scan>("/scan").then(setScan),
@@ -361,9 +377,7 @@ export function SettingsPage() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                setPrefs({ api: url.replace(/\/$/, ""), token });
-                void reload();
-                void refresh().catch((e) => notice(e.message));
+                void connect();
               }}
             >
               <label>
@@ -384,8 +398,13 @@ export function SettingsPage() {
                   onChange={(e) => setToken(e.target.value)}
                 />
               </label>
-              <button type="submit" className="primary">
-                {t("connect")}
+              <button
+                type="submit"
+                className="primary"
+                disabled={connecting}
+                aria-busy={connecting}
+              >
+                {t(connecting ? "connecting" : "connect")}
               </button>
             </form>
           </section>

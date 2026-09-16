@@ -285,13 +285,21 @@ export function PlayerBar() {
       </footer>
       {s.error && (
         <div className="player-error" role="alert">
-          {t(s.error as TextKey) || s.error}
-          {s.mediaDiagnostics && (
-            <div>
-              {t("mediaDiagnosticLabel")}:{" "}
-              {t(s.mediaDiagnostics as TextKey) || s.mediaDiagnostics}
-            </div>
-          )}
+          <div className="player-error-message">
+            {t(s.error as TextKey) || s.error}
+            {s.mediaDiagnostics && (
+              <div>
+                {t("mediaDiagnosticLabel")}:{" "}
+                {t(s.mediaDiagnostics as TextKey) || s.mediaDiagnostics}
+              </div>
+            )}
+          </div>
+          <IconButton
+            label={t("dismissError")}
+            onClick={() => player.dismissError()}
+          >
+            <X size={16} />
+          </IconButton>
         </div>
       )}
       {(s.deadline > 0 || s.waiting) && (

@@ -236,7 +236,10 @@ export const en = {
     "The server returned an invalid API response. Check the server URL and reverse proxy configuration in Settings → Server connection.",
   token: "Access token",
   connect: "Save and connect",
+  connecting: "Connecting…",
+  connected: "Connected to the server",
   error: "Something went wrong",
+  dismissError: "Dismiss error",
   retry: "Retry",
   saved: "Saved",
   sleep: "Sleep timer",
@@ -264,6 +267,11 @@ export const en = {
   airplayHint:
     "OwnTone must run on the speakers’ network. Its independent playback continues after this page closes. Pair devices using their displayed PIN.",
   airplayUnavailable: "AirPlay is not configured or available",
+  airplayQueueUnknown:
+    "AirPlay queue status is uncertain. Wait and check OwnTone before retrying. Details are in the console.",
+  requestTimeout:
+    "The request timed out. Please check the connection. Details are in the console.",
+  errorDetails: "The operation failed. See the console for details.",
   pair: "Pair",
   pin: "Device PIN",
   useOutputs: "Use selected devices",
@@ -533,7 +541,10 @@ export const zh: Record<TextKey, string> = {
     "服务端返回的接口数据无效。请在设置 → 连接服务端中检查服务端地址及反向代理配置。",
   token: "访问令牌",
   connect: "保存并连接",
+  connecting: "正在连接…",
+  connected: "已成功连接服务端",
   error: "操作未完成",
+  dismissError: "关闭错误提示",
   retry: "重试",
   saved: "已保存",
   sleep: "睡眠定时器",
@@ -560,6 +571,10 @@ export const zh: Record<TextKey, string> = {
   airplayHint:
     "OwnTone 需运行在音响所在网络。独立播放可在关闭网页后继续；需要配对时输入设备显示的 PIN。",
   airplayUnavailable: "AirPlay 尚未配置或不可用",
+  airplayQueueUnknown:
+    "AirPlay 入队结果尚未确认，请稍候查看 OwnTone 后再重试。详细信息见控制台。",
+  requestTimeout: "请求超时，请检查连接。详细信息见控制台。",
+  errorDetails: "操作失败，详细信息见控制台。",
   pair: "配对",
   pin: "设备 PIN",
   useOutputs: "使用所选设备",
