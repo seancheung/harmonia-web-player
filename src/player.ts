@@ -91,6 +91,11 @@ export class Player {
   private savedQueue: Track[] | null = null;
   private remoteVersion = "";
   private remoteStartVersion = 0;
+  private remoteStarting = false;
+  private remoteStartSubmitted = false;
+  private remoteSelectionVersion = 0;
+  private remoteSelecting = false;
+  private remoteSelections: Promise<void> = Promise.resolve();
   private repeatPending = 0;
   private repeatCommands: Promise<void> = Promise.resolve();
   private lastRemoteError = "";
@@ -259,7 +264,7 @@ export class Player {
       position: 0,
     });
     this.persist();
-    if (this.state.remote) void this.startRemote();
+    if (this.state.remote) void this.startRemote(undefined, true);
     else void this.play(true);
   }
   reconcile(tracks: Track[]) {
@@ -616,9 +621,33 @@ export class Player {
     if (index < 0 || index >= this.state.queue.length) return;
     this.cancelEndTimer();
     this.emit({ index, position: 0 });
-    if (this.state.remote)
-      void this.remote({ action: "select", index }).catch(() => {});
+    if (this.state.remote) this.selectRemote(index);
     else void this.play(true);
+  }
+  private selectRemote(index: number) {
+    const version = ++this.remoteSelectionVersion;
+    this.remoteSelecting = true;
+    this.remoteSelections = this.remoteSelections.then(async () => {
+      if (version !== this.remoteSelectionVersion) return;
+      let error = "";
+      try {
+        await api("/remote", "POST", { action: "select", index });
+      } catch (e) {
+        error = errorMessage(e);
+        this.remoteVersion = "";
+      }
+      if (version !== this.remoteSelectionVersion) return;
+      this.remoteSelecting = false;
+      // Polls begun before or during this command cannot confirm its result.
+      this.remoteSelectionVersion++;
+      await this.syncRemote(true);
+      if (error && version + 1 === this.remoteSelectionVersion)
+        this.emit({ error });
+    });
+  }
+  private cancelRemoteSelection() {
+    this.remoteSelectionVersion++;
+    this.remoteSelecting = false;
   }
   next() {
     const next = this.candidate(true);
@@ -770,7 +799,9 @@ export class Player {
   }
   clear() {
     if (this.state.remote) {
+      this.cancelRemoteSelection();
       this.remoteStartVersion++;
+      this.remoteStarting = false;
       this.emit({ loading: false });
       void this.remote({ action: "clear" }).catch(() => {});
       return;
@@ -885,7 +916,11 @@ export class Player {
       throw e;
     }
   }
-  async startRemote(outputs?: string[]) {
+  async startRemote(outputs?: string[], playing = this.state.playing) {
+    this.cancelRemoteSelection();
+    this.remoteStarting = true;
+    this.remoteStartSubmitted = false;
+    this.remoteVersion = "";
     const startVersion = ++this.remoteStartVersion;
     const transfer = { ...this.state };
     this.dispose();
@@ -893,6 +928,7 @@ export class Player {
     try {
       if (outputs) await this.remote({ action: "outputs", outputs });
       if (!transfer.queue.length) {
+        this.remoteStarting = false;
         this.emit({
           remote: true,
           loading: false,
@@ -907,8 +943,10 @@ export class Player {
       await this.remote({ action: "repeat", repeat: this.state.repeat });
       if (startVersion !== this.remoteStartVersion) return;
       this.emit({ remote: true });
+      this.remoteStartSubmitted = true;
       const result = await this.remote({
         action: "start",
+        playing,
         position: Math.round(transfer.position * 1000),
         ids: transfer.queue.map((t) => t.id),
         index: transfer.index,
@@ -919,6 +957,8 @@ export class Player {
         protect: p.protect,
       });
       if (startVersion !== this.remoteStartVersion || result?.cancelled) return;
+      this.remoteStarting = false;
+      await this.syncRemote(true);
       this.emit({ remote: true, loading: false });
       await this.remote({ action: "shuffle", shuffle: transfer.shuffle });
       await this.remote({
@@ -929,10 +969,14 @@ export class Player {
       this.persist();
     } catch {
       this.emit({ loading: false, playing: false });
+    } finally {
+      if (startVersion === this.remoteStartVersion) this.remoteStarting = false;
     }
   }
   async local() {
+    this.cancelRemoteSelection();
     this.remoteStartVersion++;
+    this.remoteStarting = false;
     const transfer = { ...this.state };
     try {
       await this.remote({ action: "local" });
@@ -949,7 +993,7 @@ export class Player {
     }
   }
   async syncRemote(force = false): Promise<void> {
-    if (this.remoteSync) {
+    while (this.remoteSync) {
       await this.remoteSync;
       if (!force) return;
     }
@@ -962,6 +1006,10 @@ export class Player {
     }
   }
   private async readRemote() {
+    if (this.remoteSelecting) return;
+    const selectionVersion = this.remoteSelectionVersion;
+    const startVersion = this.remoteStartVersion;
+    const submitted = this.remoteStartSubmitted;
     try {
       const s = await api<{
         configured: boolean;
@@ -981,6 +1029,26 @@ export class Player {
         finish: boolean;
         error: string;
       }>(`/remote?queueVersion=${encodeURIComponent(this.remoteVersion)}`);
+      if (startVersion !== this.remoteStartVersion) return;
+      if (
+        selectionVersion !== this.remoteSelectionVersion ||
+        this.remoteSelecting
+      )
+        return;
+      if (
+        this.remoteStarting &&
+        !(
+          submitted &&
+          s.player.state === "play" &&
+          s.index === this.state.index &&
+          s.queue?.length === this.state.queue.length &&
+          s.queue?.every(
+            (track, index) => track.id === this.state.queue[index].id,
+          )
+        )
+      )
+        return;
+      this.remoteStarting = false;
       if (!this.state.remote && s.player.state !== "play") return;
       if (!s.configured) {
         if (this.state.remote)
@@ -1021,6 +1089,11 @@ export class Player {
       this.lastRemoteError = s.error || "";
       if (s.queueVersion) this.remoteVersion = s.queueVersion;
     } catch (e) {
+      if (
+        selectionVersion !== this.remoteSelectionVersion ||
+        this.remoteSelecting
+      )
+        return;
       if (this.state.remote) this.emit({ error: errorMessage(e) });
     }
   }

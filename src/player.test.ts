@@ -59,6 +59,13 @@ const track = (id: string): Track =>
 const flush = async () => {
   for (let i = 0; i < 12; i++) await Promise.resolve();
 };
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+};
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
@@ -89,6 +96,187 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("player behavior", () => {
+  it.each(["next", "previous"] as const)(
+    "ignores delayed old status during remote %s",
+    async (action) => {
+      const p = new Player();
+      const initial = action === "next" ? 0 : 1;
+      const target = action === "next" ? 1 : 0;
+      p.state = {
+        ...p.state,
+        remote: true,
+        queue: [track("one"), track("two")],
+        index: initial,
+        playing: true,
+      };
+      const oldStatus = deferred<Response>();
+      const command = deferred<Response>();
+      const response = (index: number) =>
+        ({
+          ok: true,
+          json: async () => ({
+            configured: true,
+            index,
+            player: { state: "play", item_progress_ms: 500 },
+          }),
+        }) as Response;
+      let reads = 0;
+      vi.mocked(fetch).mockImplementation(async (_url, options) => {
+        if (options?.method === "POST") return command.promise;
+        return ++reads === 1 ? oldStatus.promise : response(target);
+      });
+      const polling = p.syncRemote();
+      const shown: number[] = [];
+      p.subscribe(() => {
+        shown.push(p.state.index);
+      });
+      p[action]();
+      await flush();
+      oldStatus.resolve(response(initial));
+      await polling;
+      await p.syncRemote();
+      expect(p.state.index).toBe(target);
+      expect(p.state.position).toBe(0);
+      expect(reads).toBe(1);
+      command.resolve({
+        ok: true,
+        json: async () => ({ ok: true }),
+      } as Response);
+      await flush();
+      expect(reads).toBe(2);
+      expect(p.state.position).toBe(0.5);
+      expect(shown.every((index) => index === target)).toBe(true);
+    },
+  );
+  it("serializes rapid remote selections and retains the latest selection", async () => {
+    const p = new Player();
+    p.state = {
+      ...p.state,
+      remote: true,
+      queue: [track("one"), track("two"), track("three")],
+    };
+    const first = deferred<Response>();
+    const second = deferred<Response>();
+    const selections: number[] = [];
+    vi.mocked(fetch).mockImplementation(async (_url, options) => {
+      if (options?.method === "POST") {
+        selections.push(JSON.parse(String(options.body)).index);
+        return selections.length === 1 ? first.promise : second.promise;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          configured: true,
+          index: 2,
+          player: { state: "play" },
+        }),
+      } as Response;
+    });
+    p.next();
+    await flush();
+    p.next();
+    await flush();
+    expect(selections).toEqual([1]);
+    first.resolve({ ok: true, json: async () => ({ ok: true }) } as Response);
+    await flush();
+    expect(selections).toEqual([1, 2]);
+    expect(p.state.index).toBe(2);
+    second.resolve({ ok: true, json: async () => ({ ok: true }) } as Response);
+    await flush();
+    expect(p.state.index).toBe(2);
+    expect(p.state.playing).toBe(true);
+  });
+  it("resynchronizes after a failed selection and permits subsequent playback", async () => {
+    const p = new Player();
+    p.state = { ...p.state, remote: true, queue: [track("one"), track("two")] };
+    let attempts = 0;
+    vi.mocked(fetch).mockImplementation(async (_url, options) => {
+      if (options?.method === "POST" && ++attempts === 1)
+        throw new Error("Network unavailable");
+      return {
+        ok: true,
+        json: async () => ({
+          configured: true,
+          index: attempts === 1 ? 0 : 1,
+          player: { state: "play" },
+        }),
+      } as Response;
+    });
+    p.next();
+    await flush();
+    expect(p.state.index).toBe(0);
+    expect(p.state.error).not.toBe("");
+    p.next();
+    await flush();
+    expect(p.state.index).toBe(1);
+    expect(attempts).toBe(2);
+  });
+  it.each([false, true])(
+    "preserves playing=%s when transferring to AirPlay",
+    async (playing) => {
+      const p = new Player();
+      p.state = {
+        ...p.state,
+        queue: [track("one"), track("two")],
+        index: 1,
+        position: 1.25,
+        playing,
+      };
+      const remote = vi.spyOn(p, "remote").mockResolvedValue(undefined);
+      vi.spyOn(p, "syncRemote").mockResolvedValue(undefined);
+      await p.startRemote(["speaker"]);
+      expect(remote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "start",
+          playing,
+          index: 1,
+          position: 1250,
+        }),
+      );
+    },
+  );
+  it("keeps the selected album track through stale remote updates", async () => {
+    const p = new Player();
+    p.state.remote = true;
+    const queue = [track("one"), track("two"), track("three")];
+    let finish!: () => void;
+    let starting = false;
+    vi.mocked(fetch).mockImplementation(async (_url, options) => {
+      if (options?.method === "POST") {
+        const body = JSON.parse(String(options.body));
+        if (body.action === "start") {
+          expect(body.playing).toBe(true);
+          starting = true;
+          await new Promise<void>((resolve) => {
+            finish = resolve;
+          });
+        }
+        return { ok: true, json: async () => ({ ok: true }) } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          configured: true,
+          queue,
+          index: starting ? 2 : 0,
+          player: { state: starting ? "play" : "stop" },
+        }),
+      } as Response;
+    });
+    const shown: number[] = [];
+    p.subscribe(() => {
+      shown.push(p.state.index);
+    });
+    p.replace(queue, 2, "album");
+    await flush();
+    expect(starting).toBe(true);
+    await p.syncRemote();
+    expect(p.state.playing).toBe(true);
+    expect(p.state.loading).toBe(false);
+    finish();
+    await flush();
+    expect(shown.every((index) => index === 2)).toBe(true);
+  });
   it.each([false, true])(
     "retains device volume when selecting outputs (queued: %s)",
     async (queued) => {
