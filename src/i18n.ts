@@ -289,6 +289,8 @@ export const en = {
   gapless:
     "Decoded Web Audio playback is gapless when the next track is ready. Very large files use streaming; those transitions and AirPlay depend on the output.",
   loading: "Preparing audio…",
+  playlistRefreshing: "Refreshing playlists…",
+  playlistRefreshFailed: "Playlist refresh failed. Reload to retry.",
   emptyPlaylist: "This playlist has no playable songs",
   albumView: "View albums",
   songView: "View songs",
@@ -601,6 +603,8 @@ export const zh: Record<TextKey, string> = {
   gapless:
     "下一首已就绪时，Web Audio 解码播放支持无缝衔接。超大文件使用流式播放，其衔接与 AirPlay 取决于输出路径。",
   loading: "正在准备音频…",
+  playlistRefreshing: "正在后台刷新歌单…",
+  playlistRefreshFailed: "歌单刷新失败，请刷新页面重试。",
   emptyPlaylist: "播放列表中没有可播放歌曲",
   albumView: "按专辑查看",
   songView: "按歌曲查看",

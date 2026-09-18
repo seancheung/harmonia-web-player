@@ -33,7 +33,7 @@ import { VolumeControl } from "./volume-control";
 
 export function PlayerBar() {
   const s = useSyncExternalStore(player.subscribe, player.snapshot);
-  const { t, run } = useApp();
+  const { t, run, setFavorite } = useApp();
   const [panel, setPanel] = useState<
     "queue" | "lyrics" | "output" | "sleep" | null
   >(null);
@@ -59,14 +59,7 @@ export function PlayerBar() {
       label={t("favorite")}
       active={track?.favorite}
       disabled={!track}
-      onClick={() =>
-        track &&
-        void run(() =>
-          api(`/tracks/${track.id}/favorite`, "PUT", {
-            favorite: !track.favorite,
-          }),
-        )
-      }
+      onClick={() => track && void setFavorite(track.id, !track.favorite)}
     >
       <Heart size={18} fill={track?.favorite ? "currentColor" : "none"} />
     </FavoriteButton>

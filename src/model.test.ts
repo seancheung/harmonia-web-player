@@ -138,7 +138,7 @@ describe("playback metadata", () => {
 
 it("filters BPM aliases numerically, keys as text, and excludes text case-insensitively", () => {
   const song = track({
-    tags: { tbpm: "128.5", initial_key: "F#m" },
+    tags: { tbpm: ["128.5"], initial_key: ["F#m"] },
     artist: "Artist One; Artist Two",
   });
   expect(matches(song, { field: "bpm", op: "gt", value: 120 })).toBe(true);
@@ -176,4 +176,30 @@ it("matches empty conditions without requiring a value", () => {
     expect(matches(track(patch), rule)).toBe(empty);
     expect(matches(track(patch), { ...rule, op: "isNotEmpty" })).toBe(!empty);
   }
+});
+
+it("matches unified tag arrays with any-positive and none-negative semantics", () => {
+  const item = track({
+    tags: {
+      mood: ["Calm", "Happy"],
+      blank: ["  "],
+      bpm: ["bad", "128"],
+      initialkey: ["", "F#m"],
+    },
+  });
+  expect(matches(item, { field: "tag:mood", op: "eq", value: "happy" })).toBe(
+    true,
+  );
+  expect(matches(item, { field: "tag:mood", op: "ne", value: "happy" })).toBe(
+    false,
+  );
+  expect(
+    matches(item, { field: "tag:mood", op: "notContains", value: "alm" }),
+  ).toBe(false);
+  expect(matches(item, { field: "tag:absent", op: "ne", value: "happy" })).toBe(
+    true,
+  );
+  expect(matches(item, { field: "tag:blank", op: "isEmpty" })).toBe(true);
+  expect(matches(item, { field: "bpm", op: "eq", value: 128 })).toBe(true);
+  expect(matches(item, { field: "key", op: "eq", value: "F#m" })).toBe(true);
 });

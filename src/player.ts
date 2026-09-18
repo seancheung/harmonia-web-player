@@ -146,7 +146,6 @@ export class Player {
             ...track,
             lyrics: "",
             tags: {},
-            tagValues: undefined,
           })),
         );
         this.savedQueue = queue;
@@ -276,6 +275,14 @@ export class Player {
     });
     if (this.state.queue[this.state.index]?.missing)
       this.emit({ error: "missing" });
+  }
+  setFavorite(id: string, favorite: boolean) {
+    this.emit({
+      queue: this.state.queue.map((track) =>
+        track.id === id ? { ...track, favorite } : track,
+      ),
+    });
+    this.persist();
   }
   async play(newSession = false) {
     if (this.state.remote) {

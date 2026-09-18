@@ -40,6 +40,7 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import React, {
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -252,7 +253,7 @@ function PlaylistDialog({
   sort?: string;
   desc?: boolean;
 }) {
-  const { t, run, notice } = useApp();
+  const { t, savePlaylist, notice } = useApp();
   const [name, setName] = useState(existing?.name || "");
   const [smartRule, setSmartRule] = useState(rule || existing?.rule);
   const [field, setField] = useState(existing?.sort || sort);
@@ -279,18 +280,15 @@ function PlaylistDialog({
           setSaving(true);
           try {
             if (
-              await run(() =>
-                api(
-                  `/playlists${existing ? `/${existing.id}` : ""}`,
-                  existing ? "PUT" : "POST",
-                  {
-                    name,
-                    smart: !!smartRule,
-                    rule: smartRule,
-                    sort: field,
-                    desc: direction,
-                  },
-                ),
+              await savePlaylist(
+                {
+                  name,
+                  smart: !!smartRule,
+                  rule: smartRule,
+                  sort: field,
+                  desc: direction,
+                },
+                existing?.id,
               )
             ) {
               notice(t("saved"));
@@ -447,7 +445,20 @@ function Browse({
   detail?: string;
   preset?: string;
 }) {
-  const { t, lib, prefs, error, busy, reload, run, notice } = useApp();
+  const {
+    t,
+    lib,
+    prefs,
+    error,
+    busy,
+    reload,
+    run,
+    notice,
+    setFavorite,
+    smartPlaylists,
+    playlistsRefreshing,
+    playlistError,
+  } = useApp();
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [extraColumns, setExtraColumns] = useState<SongColumn[]>(() => {
     const stored = load<unknown>("songColumns", []);
@@ -547,6 +558,15 @@ function Browse({
     setPage(1);
     setSelected(new Set());
   }, [detail, search, rule]);
+  const tracksByID = useMemo(
+    () => new Map(lib.tracks.map((track) => [track.id, track])),
+    [lib.tracks],
+  );
+  const playlistTracks = (id: string) =>
+    (smartPlaylists[id] || []).flatMap((id) => {
+      const track = tracksByID.get(id);
+      return track && !track.missing ? [track] : [];
+    });
   const all = lib.tracks.filter((t) => !t.missing);
   let tracks = all;
   let heading = t(section as TextKey) || section;
@@ -603,7 +623,7 @@ function Browse({
   if (section === "playlists" && detail) {
     heading = playlist?.name || t("missing");
     if (playlist?.smart) {
-      tracks = tracks.filter((t) => playlist.rule && matches(t, playlist.rule));
+      tracks = playlistTracks(playlist.id);
     } else {
       const byID = new Map(lib.tracks.map((t) => [t.id, t]));
       tracks = (playlist?.tracks || []).flatMap((id) => {
@@ -692,6 +712,7 @@ function Browse({
   if (groupMode && ["albums", "artists", "genres"].includes(groupType)) {
     const map = new Map<string, Track[]>();
     for (const track of tracks) {
+      if (groupType === "albums" && !track.albumId) continue;
       const keys =
         groupType === "albums"
           ? [track.albumId]
@@ -746,9 +767,9 @@ function Browse({
       p.name.toLowerCase().includes(searchText),
     )) {
       const ts = p.smart
-        ? all.filter((t) => p.rule && matches(t, p.rule))
+        ? playlistTracks(p.id)
         : p.tracks.flatMap((id) => {
-            const track = lib.tracks.find((t) => t.id === id);
+            const track = tracksByID.get(id);
             return track ? [track] : [];
           });
       groups.push({
@@ -857,9 +878,7 @@ function Browse({
         }
       : { to: "/$section" as const, params: { section: sec } };
   async function favorite(track: Track) {
-    await run(() =>
-      api(`/tracks/${track.id}/favorite`, "PUT", { favorite: !track.favorite }),
-    );
+    await setFavorite(track.id, !track.favorite);
   }
   const menu = (track: Track) => (
     <Menu>
@@ -1013,6 +1032,16 @@ function Browse({
           {detail && section === "albums" && <Cover track={tracks[0]} />}
           <div>
             <h1>{heading}</h1>
+            {section === "playlists" && playlistsRefreshing && (
+              <p className="help" role="status">
+                {t("playlistRefreshing")}
+              </p>
+            )}
+            {section === "playlists" && playlistError && (
+              <p className="help" role="alert">
+                {t("playlistRefreshFailed")}
+              </p>
+            )}
             {subheading && <p>{subheading}</p>}
           </div>
           <div className="heading-actions">

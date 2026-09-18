@@ -96,6 +96,33 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("player behavior", () => {
+  it("updates favorites in every queued occurrence without changing playback", () => {
+    const p = new Player();
+    const other = track("two");
+    p.state = {
+      ...p.state,
+      queue: [track("one"), other, track("one")],
+      index: 2,
+      position: 1.25,
+      playing: true,
+      remote: true,
+    };
+    p.setFavorite("one", true);
+    expect(p.state.queue.map((item) => item.favorite)).toEqual([
+      true,
+      other.favorite,
+      true,
+    ]);
+    expect(p.state.queue[1]).toBe(other);
+    expect(p.state).toMatchObject({
+      index: 2,
+      position: 1.25,
+      playing: true,
+      remote: true,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(new Player().state.queue[2].favorite).toBe(true);
+  });
   it.each(["next", "previous"] as const)(
     "ignores delayed old status during remote %s",
     async (action) => {

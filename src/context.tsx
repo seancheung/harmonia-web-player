@@ -1,21 +1,26 @@
 import {
   createContext,
   type ReactNode,
+  startTransition,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { errorMessage } from "./errors";
+import { FavoriteUpdates } from "./favorite-updates";
 import { en, type TextKey, zh } from "./i18n";
 import {
   api,
   defaults,
   type Library,
   load,
+  type Playlist,
   type Preferences,
   save,
 } from "./model";
 import { player } from "./player";
+import { useSmartPlaylists } from "./smart-playlists";
 
 interface Context {
   lib: Library;
@@ -27,6 +32,11 @@ interface Context {
   error: string;
   busy: boolean;
   run: (fn: () => Promise<unknown>) => Promise<boolean>;
+  setFavorite: (id: string, favorite: boolean) => Promise<void>;
+  savePlaylist: (playlist: Partial<Playlist>, id?: string) => Promise<boolean>;
+  smartPlaylists: Record<string, string[]>;
+  playlistsRefreshing: boolean;
+  playlistError: string;
 }
 const Ctx = createContext<Context | null>(null);
 export const useApp = () => {
@@ -49,6 +59,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(true);
+  const libRef = useRef(lib);
+  libRef.current = lib;
+  const reloadVersion = useRef(0);
+  const favoriteUpdates = useRef<FavoriteUpdates>();
+  if (!favoriteUpdates.current) {
+    favoriteUpdates.current = new FavoriteUpdates(
+      (id, favorite) => api(`/tracks/${id}/favorite`, "PUT", { favorite }),
+      (id, favorite) => {
+        setLib((current) => ({
+          ...current,
+          tracks: current.tracks.map((track) =>
+            track.id === id ? { ...track, favorite } : track,
+          ),
+        }));
+        player.setFavorite(id, favorite);
+      },
+    );
+  }
+  const [serverRevision, setServerRevision] = useState(0);
+  const pendingFavorites = useRef(0);
+  const playlistState = useSmartPlaylists(lib.playlists, serverRevision);
+  const favorites = favoriteUpdates.current;
   const t = (key: TextKey) => (prefs.language === "zh" ? zh : en)[key];
   const setPrefs = (patch: Partial<Preferences>) => {
     const next = { ...prefs, ...load("preferences", {}), ...patch };
@@ -56,22 +88,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updatePrefs(next);
   };
   async function reload(throwOnError = false) {
+    const version = favorites.version;
+    const request = ++reloadVersion.current;
     try {
       const data = await api<Library>("/library");
+      if (request !== reloadVersion.current) return;
+      data.tracks = favorites.merge(data.tracks, version);
       setLib(data);
+      setServerRevision((revision) => revision + 1);
       player.reconcile(data.tracks);
       setError("");
     } catch (e) {
+      if (request !== reloadVersion.current) return;
       setError(errorMessage(e));
       if (throwOnError) throw e;
     } finally {
-      setBusy(false);
+      if (request === reloadVersion.current) setBusy(false);
+    }
+  }
+  async function setFavorite(id: string, favorite: boolean) {
+    const initial =
+      libRef.current.tracks.find((track) => track.id === id)?.favorite ?? false;
+    try {
+      pendingFavorites.current++;
+      await favorites.set(id, favorite, initial);
+    } catch (e) {
+      const message = errorMessage(e);
+      setToast(t(message as TextKey) || message);
+    } finally {
+      if (--pendingFavorites.current === 0)
+        setServerRevision((revision) => revision + 1);
+    }
+  }
+  async function savePlaylist(playlist: Partial<Playlist>, id?: string) {
+    try {
+      const saved = await api<Playlist>(
+        `/playlists${id ? `/${id}` : ""}`,
+        id ? "PUT" : "POST",
+        playlist,
+      );
+      // Save completes independently of background membership calculation.
+      reloadVersion.current++;
+      startTransition(() =>
+        setLib((current) => ({
+          ...current,
+          playlists: id
+            ? current.playlists.map((item) => (item.id === id ? saved : item))
+            : [...current.playlists, saved],
+        })),
+      );
+      return true;
+    } catch (e) {
+      const message = errorMessage(e);
+      setToast(t(message as TextKey) || message);
+      return false;
     }
   }
   async function run(fn: () => Promise<unknown>) {
     try {
       await fn();
-      await reload();
+      setTimeout(() => void reload(), 0);
       return true;
     } catch (e) {
       const message = errorMessage(e);
@@ -144,6 +220,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         error,
         busy,
         run,
+        setFavorite,
+        savePlaylist,
+        ...playlistState,
       }}
     >
       {children}

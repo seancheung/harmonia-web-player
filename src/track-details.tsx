@@ -34,11 +34,7 @@ export function TrackDetails({
       ))}
     </dl>
   );
-  const tags = new Map<string, string[]>();
-  for (const [key, value] of Object.entries(track.tags || {}))
-    tags.set(key, [value]);
-  for (const [key, values] of Object.entries(track.tagValues || {}))
-    tags.set(key, values);
+  const tags = new Map(Object.entries(track.tags || {}));
   return (
     <Modal title={t("details")} close={close}>
       <div className="detail-summary">

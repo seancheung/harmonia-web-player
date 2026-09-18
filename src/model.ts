@@ -40,8 +40,7 @@ export interface Track {
   hasCover?: boolean;
   artworkRevision?: string;
   lyrics: string;
-  tags: Record<string, string>;
-  tagValues?: Record<string, string[]>;
+  tags: Record<string, string[]>;
   trackGain: number | null;
   albumGain: number | null;
   trackPeak: number | null;
@@ -142,10 +141,12 @@ export async function api<T>(
   path: string,
   method = "GET",
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   const p = load("preferences", defaults);
   const res = await fetch(`${p.api}/api${path}`, {
     method,
+    signal,
     headers: {
       "Content-Type": "application/json",
       ...(p.token ? { Authorization: `Bearer ${p.token}` } : {}),
@@ -224,14 +225,33 @@ export function matches(t: Track, r: Rule): boolean {
         return false;
     }
   }
+  if (r.field?.startsWith("tag:")) {
+    const values = t.tags?.[r.field.slice(4)] || [];
+    if (r.op === "isEmpty" || r.op === "isNotEmpty") {
+      const empty = values.every((value) => !value.trim());
+      return r.op === "isEmpty" ? empty : !empty;
+    }
+    const negative = r.op === "ne" || r.op === "notContains";
+    const op =
+      r.op === "ne" ? "eq" : r.op === "notContains" ? "contains" : r.op;
+    const found = values.some((value) =>
+      matches(
+        { ...t, title: value },
+        { ...r, field: "title", op, value: String(r.value ?? "") },
+      ),
+    );
+    return negative ? !found : found;
+  }
   const actual =
     r.field === "bpm"
       ? ["bpm", "tbpm", "tempo"]
-          .map((key) => Number(t.tags?.[key]?.trim()))
+          .flatMap((key) => t.tags?.[key] || [])
+          .map((value) => Number(value.trim()))
           .find((n) => Number.isFinite(n) && n > 0)
       : r.field === "key"
         ? ["initialkey", "initial_key", "tkey", "key"]
-            .map((key) => t.tags?.[key]?.trim())
+            .flatMap((key) => t.tags?.[key] || [])
+            .map((value) => value.trim())
             .find(Boolean) || ""
         : r.field?.startsWith("tag:")
           ? t.tags?.[r.field.slice(4)]
