@@ -231,9 +231,11 @@ p {
   padding: 11px 14px;
   border-radius: 7px;
   font-size: 13px;
-}
-.sidebar nav > a svg {
   color: var(--muted);
+}
+.sidebar nav > a svg,
+.sidebar-bottom > a svg {
+  color: inherit;
 }
 .sidebar nav > a:hover,
 .sidebar-bottom > a:hover {
@@ -243,9 +245,6 @@ p {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent);
   font-weight: 600;
-}
-.sidebar nav > .nav-active svg {
-  color: var(--accent);
 }
 .nav-count {
   margin-left: auto;

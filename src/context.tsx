@@ -78,8 +78,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }
   const [serverRevision, setServerRevision] = useState(0);
+  const [favoriteRevision, setFavoriteRevision] = useState(0);
   const pendingFavorites = useRef(0);
-  const playlistState = useSmartPlaylists(lib.playlists, serverRevision);
+  const playlistState = useSmartPlaylists(
+    lib.playlists,
+    serverRevision,
+    favoriteRevision,
+  );
   const favorites = favoriteUpdates.current;
   const t = (key: TextKey) => (prefs.language === "zh" ? zh : en)[key];
   const setPrefs = (patch: Partial<Preferences>) => {
@@ -117,7 +122,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setToast(t(message as TextKey) || message);
     } finally {
       if (--pendingFavorites.current === 0)
-        setServerRevision((revision) => revision + 1);
+        setFavoriteRevision((revision) => revision + 1);
     }
   }
   async function savePlaylist(playlist: Partial<Playlist>, id?: string) {

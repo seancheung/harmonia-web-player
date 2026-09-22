@@ -190,7 +190,7 @@ function Shell() {
             params={{ section: "settings" }}
             activeProps={{ className: "nav-active" }}
           >
-            <Settings2 size={19} />
+            <Settings2 size={19} strokeWidth={1.8} />
             <span>{t("settings")}</span>
           </Link>
         </div>
