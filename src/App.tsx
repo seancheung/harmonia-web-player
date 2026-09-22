@@ -61,6 +61,7 @@ import { AppProvider, useApp } from "./context";
 import { DialogPresence } from "./dialog-presence";
 import { HomePage } from "./home";
 import type { TextKey } from "./i18n";
+import { LibrarySkeleton, SkeletonHeading } from "./library-skeleton";
 import {
   api,
   duration,
@@ -1026,101 +1027,107 @@ function Browse({
         <ThemeToggle />
       </div>
       <div className="page-content">
-        <header
-          className={`page-heading ${detail && section === "albums" ? "album-heading" : ""}`}
-        >
-          {detail && section === "albums" && <Cover track={tracks[0]} />}
-          <div>
-            <h1>{heading}</h1>
-            {section === "playlists" && playlistsRefreshing && (
-              <p className="help" role="status">
-                {t("playlistRefreshing")}
-              </p>
-            )}
-            {section === "playlists" && playlistError && (
-              <p className="help" role="alert">
-                {t("playlistRefreshFailed")}
-              </p>
-            )}
-            {subheading && <p>{subheading}</p>}
-          </div>
-          <div className="heading-actions">
-            {section === "playlists" && !detail ? (
-              <CreatePlaylistMenu expanded />
-            ) : (
-              playAllTracks.length > 0 && (
-                <button
-                  type="button"
-                  className="primary"
-                  onClick={() =>
-                    player.replace(
-                      playAllTracks,
-                      0,
-                      section === "albums" && detail ? "album" : "track",
-                    )
-                  }
-                >
-                  <Play size={15} fill="currentColor" />
-                  {t("playAll")}
-                </button>
-              )
-            )}
-            {playlist && (
-              <Menu>
-                {(close) => (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditing(playlist);
-                        close();
-                      }}
-                    >
-                      {t("edit")}
-                    </button>
-                    {!playlist.smart && (
+        {busy && detail ? (
+          <SkeletonHeading album={section === "albums"} />
+        ) : (
+          <header
+            className={`page-heading ${detail && section === "albums" ? "album-heading" : ""}`}
+          >
+            {detail && section === "albums" && <Cover track={tracks[0]} />}
+            <div>
+              <h1>{heading}</h1>
+              {section === "playlists" && playlistsRefreshing && (
+                <p className="help" role="status">
+                  {t("playlistRefreshing")}
+                </p>
+              )}
+              {section === "playlists" && playlistError && (
+                <p className="help" role="alert">
+                  {t("playlistRefreshFailed")}
+                </p>
+              )}
+              {!busy && subheading && <p>{subheading}</p>}
+            </div>
+            <div className="heading-actions">
+              {section === "playlists" && !detail ? (
+                <CreatePlaylistMenu expanded />
+              ) : (
+                playAllTracks.length > 0 && (
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={() =>
+                      player.replace(
+                        playAllTracks,
+                        0,
+                        section === "albums" && detail ? "album" : "track",
+                      )
+                    }
+                  >
+                    <Play size={15} fill="currentColor" />
+                    {t("playAll")}
+                  </button>
+                )
+              )}
+              {playlist && (
+                <Menu>
+                  {(close) => (
+                    <>
                       <button
                         type="button"
                         onClick={() => {
-                          void run(() =>
-                            api(`/playlists/${detail}/items`, "POST", {
-                              action: "clean",
-                              ids: [],
-                            }),
-                          );
+                          setEditing(playlist);
                           close();
                         }}
                       >
-                        {t("cleanMissing")}
+                        {t("edit")}
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirm(t("deletePlaylistHint")))
-                          void run(() => api(`/playlists/${detail}`, "DELETE"));
-                        close();
-                      }}
-                    >
-                      {t("delete")}
-                    </button>
-                  </>
-                )}
-              </Menu>
-            )}
-            {section === "recent" && (
-              <IconButton
-                label={t("clearRecent")}
-                onClick={() => {
-                  if (confirm(t("recentHint")))
-                    void run(() => api("/recent", "DELETE"));
-                }}
-              >
-                <X size={18} />
-              </IconButton>
-            )}
-          </div>
-        </header>
+                      {!playlist.smart && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void run(() =>
+                              api(`/playlists/${detail}/items`, "POST", {
+                                action: "clean",
+                                ids: [],
+                              }),
+                            );
+                            close();
+                          }}
+                        >
+                          {t("cleanMissing")}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(t("deletePlaylistHint")))
+                            void run(() =>
+                              api(`/playlists/${detail}`, "DELETE"),
+                            );
+                          close();
+                        }}
+                      >
+                        {t("delete")}
+                      </button>
+                    </>
+                  )}
+                </Menu>
+              )}
+              {section === "recent" && (
+                <IconButton
+                  label={t("clearRecent")}
+                  onClick={() => {
+                    if (confirm(t("recentHint")))
+                      void run(() => api("/recent", "DELETE"));
+                  }}
+                >
+                  <X size={18} />
+                </IconButton>
+              )}
+            </div>
+          </header>
+        )}
         {error && (
           <div className="error-banner">
             <Info size={18} />
@@ -1352,11 +1359,16 @@ function Browse({
             </Modal>
           )}
         </DialogPresence>
-        {busy ? (
-          <div className="empty-state">
-            <div className="spinner" />
-            <p role="status">{t("loadingLibrary")}</p>
-          </div>
+        {busy ||
+        (playlist?.smart &&
+          playlistsRefreshing &&
+          !Object.hasOwn(smartPlaylists, playlist.id)) ? (
+          <LibrarySkeleton
+            label={t(busy ? "loadingLibrary" : "playlistRefreshing")}
+            variant={view.grid ? (groupMode ? "cards" : "song-grid") : "rows"}
+            artists={groupMode && groupType === "artists"}
+            folders={groupMode && groupType === "folders"}
+          />
         ) : !folderExists ? (
           <div className="empty-state">
             <Folder size={42} />

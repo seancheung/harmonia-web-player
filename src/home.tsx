@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Cover, IconButton } from "./components";
 import { useApp } from "./context";
 import type { TextKey } from "./i18n";
+import { LibrarySkeleton } from "./library-skeleton";
 import { splitMembers as splitTagMembers, type Track } from "./model";
 import { player } from "./player";
 import { ThemeToggle } from "./theme-toggle";
@@ -119,7 +120,7 @@ export function HomePage() {
       </div>
       <div className="page-content home-page">
         {busy ? (
-          <p role="status">{t("loadingLibrary")}</p>
+          <LibrarySkeleton variant="home" label={t("loadingLibrary")} />
         ) : error ? (
           <div role="alert">
             <p>{t(error as TextKey) || error}</p>

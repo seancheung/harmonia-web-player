@@ -2,6 +2,97 @@
 @theme {
   --font-sans: "Inter", "Segoe UI", sans-serif;
 }
+
+.skeleton-shape {
+  display: block;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--muted) 16%, var(--bg));
+  animation: skeleton-pulse 1.8s ease-in-out infinite;
+}
+.library-skeleton {
+  min-width: 0;
+}
+.skeleton-art {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+}
+.skeleton-copy {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.skeleton-line {
+  width: 75%;
+  height: 12px;
+}
+.skeleton-line-short {
+  width: 48%;
+  height: 10px;
+}
+.skeleton-card {
+  min-width: 0;
+}
+.skeleton-card .skeleton-copy {
+  margin-top: 16px;
+}
+.skeleton-artist .skeleton-art,
+.skeleton-round {
+  border-radius: 50%;
+}
+.skeleton-artist .skeleton-line {
+  margin-inline: auto;
+}
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 10px;
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+}
+.skeleton-row-cover {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+}
+.skeleton-row-meta {
+  width: 40px;
+  height: 10px;
+  margin-inline: 20px;
+}
+.skeleton-section-title {
+  width: 160px;
+  height: 22px;
+}
+.skeleton-section-action {
+  width: 50px;
+  height: 10px;
+}
+.skeleton-heading-copy {
+  flex: 1;
+  min-width: 0;
+  padding-block: 8px;
+}
+.skeleton-heading-title {
+  width: min(320px, 80%);
+  height: 36px;
+  margin-bottom: 18px;
+}
+.skeleton-heading-subtitle {
+  width: min(200px, 60%);
+}
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shape {
+    animation: none;
+  }
+}
 :root {
   color-scheme: light;
   font-family: var(--font-sans);
