@@ -40,11 +40,16 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import React, {
   useEffect,
-  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+import {
+  type BrowseQuery,
+  type BrowsePage as BrowseResponse,
+  browsePath,
+  playBrowse,
+} from "./browse-api";
 import {
   Cover,
   emptyRule,
@@ -66,14 +71,13 @@ import {
   api,
   duration,
   load,
-  matches,
   type Playlist,
   type Rule,
   save,
-  sortTracks,
   splitMembers as splitTagMembers,
   type Track,
 } from "./model";
+import { usePage } from "./page-cache";
 import { player } from "./player";
 import { PlayerBar } from "./player-ui";
 import { Select, SelectOption } from "./select";
@@ -399,21 +403,18 @@ interface ViewPrefs {
   desc: boolean;
   size: number;
 }
-interface Group {
-  playCount?: number;
-  modifiedAt?: number;
-  createdAt?: number;
-  id: string;
-  name: string;
-  subtitle: string;
-  tracks: Track[];
-  year: number;
-  addedAt: number;
-  count: number;
-  albumCount: number;
-  artist: string;
-}
+const browsePositions = new Map<
+  string,
+  {
+    page: number;
+    search: string;
+    rule?: Rule;
+    albums: boolean;
+    disc: number | null;
+  }
+>();
 function BrowsePage() {
+  const { prefs } = useApp();
   const { preset } = useSearch({ strict: false });
   const params = useParams({ strict: false }) as {
     section?: string;
@@ -424,7 +425,13 @@ function BrowsePage() {
   if (section === "settings") return <SettingsPage />;
   return (
     <Browse
-      key={`${section}-${preset || ""}`}
+      key={JSON.stringify([
+        prefs.api,
+        prefs.token,
+        section,
+        params.detail,
+        preset,
+      ])}
       section={section}
       detail={params.detail}
       preset={
@@ -450,17 +457,20 @@ function Browse({
     t,
     lib,
     prefs,
-    error,
-    busy,
-    reload,
+
     reloadPlaylists,
     run,
     notice,
     setFavorite,
-    smartPlaylists,
-    playlistsRefreshing,
-    playlistError,
   } = useApp();
+  const positionKey = JSON.stringify([
+    prefs.api,
+    prefs.token,
+    section,
+    detail,
+    preset,
+  ]);
+  const previousPosition = browsePositions.get(positionKey);
   const runPlaylist = (fn: () => Promise<unknown>) => run(fn, "playlists");
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [extraColumns, setExtraColumns] = useState<SongColumn[]>(() => {
@@ -497,9 +507,11 @@ function Browse({
         }
       : {}),
   }));
-  const [page, setPage] = useState(1);
-  const [search, setAppliedSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const [page, setPage] = useState(previousPosition?.page ?? 1);
+  const [search, setAppliedSearch] = useState(previousPosition?.search ?? "");
+  const [searchInput, setSearchInput] = useState(
+    previousPosition?.search ?? "",
+  );
   const composing = useRef(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
@@ -517,18 +529,20 @@ function Browse({
   useEffect(() => () => clearTimeout(searchTimer.current), []);
   const [filterOpen, setFilterOpen] = useState(false);
   const [rule, setRule] = useState<Rule | undefined>(() =>
-    preset === "topSongs" || preset === "topArtists" || preset === "unheard"
-      ? {
-          mode: "all",
-          rules: [
-            {
-              field: "playCount",
-              op: preset === "unheard" ? "eq" : "gt",
-              value: 0,
-            },
-          ],
-        }
-      : undefined,
+    previousPosition
+      ? previousPosition.rule
+      : preset === "topSongs" || preset === "topArtists" || preset === "unheard"
+        ? {
+            mode: "all",
+            rules: [
+              {
+                field: "playCount",
+                op: preset === "unheard" ? "eq" : "gt",
+                value: 0,
+              },
+            ],
+          }
+        : undefined,
   );
   const [draft, setDraft] = useState<Rule>(emptyRule);
   const [smart, setSmart] = useState(false);
@@ -544,12 +558,13 @@ function Browse({
   }, [section]);
   const [details, setDetails] = useState<Track>();
   const [detailAlbums, setDetailAlbums] = useState(
-    section === "artists" || section === "genres",
+    previousPosition?.albums ?? (section === "artists" || section === "genres"),
   );
-  const [selectedDisc, setSelectedDisc] = useState<number | null>(null);
-  useEffect(() => setSelectedDisc(null), [detail]);
+  const [selectedDisc, setSelectedDisc] = useState<number | null>(
+    previousPosition?.disc ?? null,
+  );
   const playback = useSyncExternalStore(player.subscribe, player.snapshot);
-  const playlist = lib.playlists.find((p) => p.id === detail);
+
   const updateView = (patch: Partial<ViewPrefs>) => {
     setView((v) => {
       const next = { ...v, ...patch };
@@ -563,108 +578,29 @@ function Browse({
     )
       setPage(1);
   };
+  const filters = JSON.stringify([search, rule]);
+  const previousFilters = useRef(filters);
   useEffect(() => {
-    setPage(1);
-    setSelected(new Set());
-  }, [detail, search, rule]);
-  const tracksByID = useMemo(
-    () => new Map(lib.tracks.map((track) => [track.id, track])),
-    [lib.tracks],
-  );
-  const playlistTracks = (id: string) =>
-    (smartPlaylists[id] || []).flatMap((id) => {
-      const track = tracksByID.get(id);
-      return track && !track.missing ? [track] : [];
-    });
-  const all = lib.tracks.filter((t) => !t.missing);
-  let tracks = all;
-  let heading = t(section as TextKey) || section;
-  let subheading = "";
-  let sourceID = "",
-    folder = "";
-  if (section === "favorites") tracks = tracks.filter((t) => t.favorite);
-  if (section === "recent") {
-    tracks = tracks.filter((t) => t.lastPlayed);
-  }
-  if (detail && section === "albums") {
-    tracks = tracks.filter((t) => t.albumId === detail);
-    heading = tracks[0]?.album || t("unknownAlbum");
-    subheading =
-      tracks[0]?.albumArtist || tracks[0]?.artist || t("unknownArtist");
-    subheading += ` · ${tracks[0]?.year || t("unknownYear")}`;
-  }
-  if (detail && section === "artists") {
-    tracks = tracks.filter(
-      (t) =>
-        (detail === "__unknown__" &&
-          !t.artist.trim() &&
-          !t.albumArtist.trim()) ||
-        splitMembers(t.artist).some(
-          (a) => a.toLowerCase() === detail.toLowerCase(),
-        ) ||
-        splitMembers(t.albumArtist).some(
-          (a) => a.toLowerCase() === detail.toLowerCase(),
-        ),
-    );
-    heading = detail === "__unknown__" ? t("unknownArtist") : detail;
-  }
-  if (detail && section === "genres") {
-    tracks = tracks.filter((t) =>
-      detail === "__unknown__"
-        ? !t.genre.trim()
-        : splitMembers(t.genre).some(
-            (g) => g.toLowerCase() === detail.toLowerCase(),
-          ),
-    );
-    heading = detail === "__unknown__" ? t("unknownGenre") : detail;
-  }
-  if (section === "folders" && detail) {
-    const parts = detail.split("|");
-    sourceID = parts[0];
-    folder = parts.slice(1).join("|");
-    const source = lib.sources.find((s) => s.id === sourceID);
-    heading = folder.split("/").pop() || source?.name || t("folders");
-    subheading = source?.error || "";
-    tracks = tracks.filter(
-      (t) => t.sourceId === sourceID && t.folder === folder,
-    );
-  }
-  if (section === "playlists" && detail) {
-    heading = playlist?.name || t("missing");
-    if (playlist?.smart) {
-      tracks = playlistTracks(playlist.id);
-    } else {
-      const byID = new Map(lib.tracks.map((t) => [t.id, t]));
-      tracks = (playlist?.tracks || []).flatMap((id) => {
-        const track = byID.get(id);
-        return track ? [track] : [];
-      });
+    if (previousFilters.current !== filters) {
+      setPage(1);
+      setSelected(new Set());
     }
-  }
+    previousFilters.current = filters;
+  }, [filters]);
+  useEffect(() => {
+    browsePositions.set(positionKey, {
+      page,
+      search,
+      rule,
+      albums: detailAlbums,
+      disc: selectedDisc,
+    });
+    if (browsePositions.size > 120) {
+      const oldest = browsePositions.keys().next().value;
+      if (oldest) browsePositions.delete(oldest);
+    }
+  }, [positionKey, page, search, rule, detailAlbums, selectedDisc]);
   const isAlbumDetail = section === "albums" && !!detail;
-  const albumDiscs = isAlbumDetail
-    ? [...new Set(tracks.map((track) => track.disc || 1))].sort((a, b) => a - b)
-    : [];
-  const activeDisc =
-    albumDiscs.length > 1 &&
-    selectedDisc !== null &&
-    albumDiscs.includes(selectedDisc)
-      ? selectedDisc
-      : null;
-  if (activeDisc !== null)
-    tracks = tracks.filter((track) => (track.disc || 1) === activeDisc);
-  const showDiscNumber = albumDiscs.length > 1 && activeDisc === null;
-  const searchText = search.toLowerCase();
-  tracks = tracks.filter(
-    (t) =>
-      !search ||
-      [t.title, t.artist, t.album, t.genre]
-        .join(" ")
-        .toLowerCase()
-        .includes(searchText),
-  );
-  if (rule) tracks = tracks.filter((t) => matches(t, rule));
-  const manual = section === "playlists" && !!detail && !playlist?.smart;
   const supportsAlbumView = !!detail && ["artists", "genres"].includes(section);
   const groupMode =
     (!detail &&
@@ -684,201 +620,62 @@ function Browse({
             : ["title", "count", "albumCount"]
         : songSort;
   const viewSort = sortFields.includes(view.sort) ? view.sort : sortFields[0];
-  const sort = playlist?.smart
-    ? playlist.sort
-    : section === "recent"
-      ? "lastPlayed"
-      : section === "albums" && detail && viewSort === "title"
-        ? "disc"
-        : viewSort;
-  const desc = playlist?.smart
-    ? playlist.desc
-    : section === "recent"
-      ? true
-      : view.desc;
-  if (!manual) tracks = sortTracks(tracks, sort, desc);
-  const playAllTracks =
-    section === "folders" && detail
-      ? sortTracks(
-          all.filter(
-            (track) =>
-              track.sourceId === sourceID &&
-              (!folder ||
-                track.folder === folder ||
-                track.folder.startsWith(`${folder}/`)) &&
-              (!search ||
-                [track.title, track.artist, track.album, track.genre]
-                  .join(" ")
-                  .toLowerCase()
-                  .includes(searchText)) &&
-              (!rule || matches(track, rule)),
-          ),
-          sort,
-          desc,
-        )
-      : tracks;
-  const groups: Group[] = [];
-  if (groupMode && ["albums", "artists", "genres"].includes(groupType)) {
-    const map = new Map<string, Track[]>();
-    for (const track of tracks) {
-      if (groupType === "albums" && !track.albumId) continue;
-      const keys =
-        groupType === "albums"
-          ? [track.albumId]
-          : groupType === "artists"
-            ? [
-                ...new Set([
-                  ...splitMembers(track.artist),
-                  ...(preset === "topArtists"
-                    ? []
-                    : splitMembers(track.albumArtist)),
-                ]),
-              ]
-            : splitMembers(track.genre);
-      if (!keys.length) keys.push("__unknown__");
-      for (const key of keys) {
-        const normalized = groupType === "albums" ? key : key.toLowerCase();
-        const found = map.get(normalized) || [];
-        found.push(track);
-        map.set(normalized, found);
-      }
-    }
-    for (const [id, items] of map) {
-      const first = items[0];
-      const name =
-        groupType === "albums"
-          ? first.album || t("unknownAlbum")
-          : groupType === "artists"
-            ? [
-                ...splitMembers(first.artist),
-                ...splitMembers(first.albumArtist),
-              ].find((a) => a.toLowerCase() === id) || t("unknownArtist")
-            : splitMembers(first.genre).find((g) => g.toLowerCase() === id) ||
-              t("unknownGenre");
-      groups.push({
-        playCount: items.reduce((total, track) => total + track.playCount, 0),
-        id: groupType === "albums" || id === "__unknown__" ? id : name,
-        name,
-        subtitle:
-          groupType === "albums"
-            ? first.albumArtist || first.artist || t("unknownArtist")
-            : `${items.length} ${t("songs")}`,
-        tracks: sortTracks(items, "addedAt", false),
-        year: first.year,
-        addedAt: Math.min(...items.map((t) => t.addedAt)),
-        count: items.length,
-        albumCount: new Set(items.map((t) => t.albumId)).size,
-        artist: first.albumArtist || first.artist,
-      });
-    }
-  } else if (groupMode && section === "playlists") {
-    for (const p of lib.playlists.filter((p) =>
-      p.name.toLowerCase().includes(searchText),
-    )) {
-      const ts = p.smart
-        ? playlistTracks(p.id)
-        : p.tracks.flatMap((id) => {
-            const track = tracksByID.get(id);
-            return track ? [track] : [];
-          });
-      groups.push({
-        id: p.id,
-        name: p.name,
-        subtitle: `${ts.length} ${t("songs")}${p.smart ? ` · ${t("smart")}` : ""}`,
-        tracks: ts,
-        year: 0,
-        addedAt: 0,
-        count: ts.length,
-        albumCount: 0,
-        artist: "",
-      });
-    }
-  } else if (groupMode && section === "folders") {
-    for (const s of lib.sources) {
-      groups.push({
-        id: `${s.id}|`,
-        modifiedAt: s.folderTimes?.[""]?.modifiedAt,
-        createdAt: s.folderTimes?.[""]?.createdAt,
-        name: s.name,
-        subtitle: s.error || "",
-        tracks: all.filter((t) => t.sourceId === s.id),
-        year: 0,
-        addedAt: 0,
-        count: 0,
-        albumCount: 0,
-        artist: "",
-      });
-    }
-  }
-  if (groupMode)
-    groups.sort((a, b) => {
-      const field = ["title", "filename"].includes(viewSort)
-        ? "name"
-        : viewSort;
-      const av = a[field as keyof Group],
-        bv = b[field as keyof Group];
-      const am = av === "" || av === 0 || av === undefined,
-        bm = bv === "" || bv === 0 || bv === undefined;
-      if (am !== bm) return am ? 1 : -1;
-      const cmp =
-        typeof av === "number" && typeof bv === "number"
-          ? av - bv
-          : String(av).localeCompare(String(bv));
-      return (
-        (view.desc ? -cmp : cmp) ||
-        a.name.localeCompare(b.name) ||
-        a.id.localeCompare(b.id)
-      );
-    });
-  const childFolders =
-    section === "folders" && detail
-      ? [
-          ...new Set(
-            all
-              .filter(
-                (t) =>
-                  t.sourceId === sourceID &&
-                  (folder === "" || t.folder.startsWith(`${folder}/`)),
-              )
-              .map((t) => {
-                const suffix = folder
-                  ? t.folder.slice(folder.length + 1)
-                  : t.folder;
-                return suffix.split("/")[0];
-              })
-              .filter(Boolean),
-          ),
-        ].sort((a, b) => {
-          if (viewSort === "modifiedAt" || viewSort === "createdAt") {
-            const times = lib.sources.find(
-              (s) => s.id === sourceID,
-            )?.folderTimes;
-            const av = times?.[folder ? `${folder}/${a}` : a]?.[viewSort] || 0;
-            const bv = times?.[folder ? `${folder}/${b}` : b]?.[viewSort] || 0;
-            if (!!av !== !!bv) return av ? -1 : 1;
-            if (av !== bv) return (av - bv) * (view.desc ? -1 : 1);
-          }
-          return a.localeCompare(b) * (view.desc ? -1 : 1);
-        })
-      : [];
-  const folderExists =
-    !folder ||
-    all.some(
-      (t) =>
-        t.sourceId === sourceID &&
-        (t.folder === folder || t.folder.startsWith(`${folder}/`)),
-    );
-  const total = groupMode ? groups.length : tracks.length + childFolders.length;
-  const maxPage = Math.max(1, Math.ceil(total / view.size));
-  const currentPage = Math.min(page, maxPage);
-  const start = (currentPage - 1) * view.size;
-  const pageGroups = groups.slice(start, start + view.size);
-  const pageFolders = childFolders.slice(start, start + view.size);
-  const pageTracks = tracks.slice(
-    Math.max(0, start - childFolders.length),
-    Math.max(0, start + view.size - childFolders.length),
-  );
-  const selectedTracks = tracks.filter((t) => selected.has(t.id));
+  const pageQuery: BrowseQuery = {
+    section,
+    detail,
+    preset,
+    search,
+    rule,
+    sort: viewSort,
+    desc: view.desc,
+    page,
+    pageSize: view.size,
+    albums: supportsAlbumView && detailAlbums,
+    disc: selectedDisc ?? 0,
+  };
+  const {
+    data,
+    loading: busy,
+    error,
+    refresh: reload,
+  } = usePage<BrowseResponse>(browsePath(pageQuery));
+  const playlist = data?.playlist || lib.playlists.find((p) => p.id === detail);
+  const manual = section === "playlists" && !!detail && !playlist?.smart;
+  const tracks = data?.items || [];
+  const heading = data?.heading || t(section as TextKey) || section;
+  const subheading = data?.artist
+    ? `${data.artist} · ${data.year || t("unknownYear")}`
+    : "";
+  const sourceID = section === "folders" ? (detail || "").split("|")[0] : "";
+  const folder =
+    section === "folders" ? (detail || "").split("|").slice(1).join("|") : "";
+  const albumDiscs = data?.discs || [];
+  const activeDisc = selectedDisc;
+  const showDiscNumber = albumDiscs.length > 1 && activeDisc === null;
+  const total = data?.total || 0,
+    maxPage = Math.max(1, Math.ceil(total / view.size)),
+    currentPage = page;
+  const start = (page - 1) * view.size;
+  const pageGroups = (data?.groups || []).map((group) => ({
+    ...group,
+    name:
+      group.name === "__unknown__"
+        ? t(groupType === "artists" ? "unknownArtist" : "unknownGenre")
+        : group.name,
+    subtitle:
+      groupType === "albums"
+        ? group.artist
+        : `${group.count} ${t("songs")}${group.smart ? ` · ${t("smart")}` : ""}`,
+  }));
+  const pageFolders = data?.folders || [],
+    pageTracks = tracks;
+  const folderExists = data?.folderExists ?? true;
+  const selectedTracks = tracks.filter((track) => selected.has(track.id));
+  const playQuery = (query: BrowseQuery, mode: "album" | "track" = "track") =>
+    void playBrowse(query, mode).catch((e) => notice(e.message));
+  useEffect(() => {
+    setSelected(new Set());
+  }, [page]);
   const link = (sec: string, id?: string) =>
     id
       ? {
@@ -887,7 +684,7 @@ function Browse({
         }
       : { to: "/$section" as const, params: { section: sec } };
   async function favorite(track: Track) {
-    await setFavorite(track.id, !track.favorite);
+    await setFavorite(track.id, !track.favorite, track.favorite);
   }
   const menu = (track: Track) => (
     <Menu>
@@ -950,7 +747,11 @@ function Browse({
                 onClick={() => {
                   const pos = prompt(
                     t("position"),
-                    String((playlist?.tracks.indexOf(track.id) || 0) + 1),
+                    String(
+                      start +
+                        tracks.findIndex((item) => item.id === track.id) +
+                        1,
+                    ),
                   );
                   if (pos)
                     void runPlaylist(() =>
@@ -1041,34 +842,25 @@ function Browse({
           <header
             className={`page-heading ${detail && section === "albums" ? "album-heading" : ""}`}
           >
-            {detail && section === "albums" && <Cover track={tracks[0]} />}
+            {detail && section === "albums" && (
+              <Cover track={data?.cover || tracks[0]} />
+            )}
             <div>
               <h1>{heading}</h1>
-              {section === "playlists" && playlistsRefreshing && (
-                <p className="help" role="status">
-                  {t("playlistRefreshing")}
-                </p>
-              )}
-              {section === "playlists" && playlistError && (
-                <p className="help" role="alert">
-                  {t("playlistRefreshFailed")}
-                </p>
-              )}
               {!busy && subheading && <p>{subheading}</p>}
             </div>
             <div className="heading-actions">
               {section === "playlists" && !detail ? (
                 <CreatePlaylistMenu expanded />
               ) : (
-                playAllTracks.length > 0 && (
+                (data?.trackCount || 0) > 0 && (
                   <button
                     type="button"
                     className="primary"
                     onClick={() =>
-                      player.replace(
-                        playAllTracks,
-                        0,
-                        section === "albums" && detail ? "album" : "track",
+                      playQuery(
+                        { ...pageQuery, recursive: section === "folders" },
+                        isAlbumDetail ? "album" : "track",
                       )
                     }
                   >
@@ -1367,10 +1159,7 @@ function Browse({
             </Modal>
           )}
         </DialogPresence>
-        {busy ||
-        (playlist?.smart &&
-          playlistsRefreshing &&
-          !Object.hasOwn(smartPlaylists, playlist.id)) ? (
+        {busy ? (
           <LibrarySkeleton
             label={t(busy ? "loadingLibrary" : "playlistRefreshing")}
             variant={view.grid ? (groupMode ? "cards" : "song-grid") : "rows"}
@@ -1390,9 +1179,15 @@ function Browse({
                 <Music2 size={22} />
               </span>
             </div>
-            <h2>{t(all.length === 0 ? "empty" : "noResults")}</h2>
-            <p>{t(all.length === 0 ? "emptyHint" : "noResultsHint")}</p>
-            {all.length === 0 ? (
+            <h2>
+              {t((data?.libraryCount || 0) === 0 ? "empty" : "noResults")}
+            </h2>
+            <p>
+              {t(
+                (data?.libraryCount || 0) === 0 ? "emptyHint" : "noResultsHint",
+              )}
+            </p>
+            {(data?.libraryCount || 0) === 0 ? (
               <Link {...link("settings")} className="primary">
                 {t("openSettings")}
                 <ArrowUpRight size={16} />
@@ -1476,20 +1271,14 @@ function Browse({
                   label={t("play")}
                   disabled={groupType === "folders" && !group.tracks.length}
                   onClick={() =>
-                    player.replace(
-                      groupType === "folders"
-                        ? sortTracks(group.tracks, viewSort, view.desc)
-                        : groupType === "playlists"
-                          ? (() => {
-                              const list = lib.playlists.find(
-                                (p) => p.id === group.id,
-                              );
-                              return list?.smart
-                                ? sortTracks(group.tracks, list.sort, list.desc)
-                                : group.tracks;
-                            })()
-                          : sortTracks(group.tracks, "disc", false),
-                      0,
+                    playQuery(
+                      {
+                        section: groupType,
+                        detail: group.id,
+                        sort: groupType === "folders" ? viewSort : "disc",
+                        desc: groupType === "folders" ? view.desc : false,
+                        recursive: groupType === "folders",
+                      },
                       groupType === "albums" ? "album" : "track",
                     )
                   }
@@ -1507,16 +1296,6 @@ function Browse({
               {pageFolders.map((name) => {
                 const path = `${folder ? `${folder}/` : ""}${name}`;
                 const destination = link("folders", `${sourceID}|${path}`);
-                const folderTracks = sortTracks(
-                  all.filter(
-                    (track) =>
-                      track.sourceId === sourceID &&
-                      (track.folder === path ||
-                        track.folder.startsWith(`${path}/`)),
-                  ),
-                  viewSort,
-                  view.desc,
-                );
                 return (
                   <article className="group-card" key={name}>
                     <Link
@@ -1533,8 +1312,15 @@ function Browse({
                     </div>
                     <IconButton
                       label={`${t("play")} ${name}`}
-                      disabled={!folderTracks.length}
-                      onClick={() => player.replace(folderTracks)}
+                      onClick={() =>
+                        playQuery({
+                          section: "folders",
+                          detail: `${sourceID}|${path}`,
+                          recursive: true,
+                          sort: viewSort,
+                          desc: view.desc,
+                        })
+                      }
                     >
                       <Play size={18} fill="currentColor" />
                     </IconButton>
@@ -1583,11 +1369,7 @@ function Browse({
                 >
                   {!view.grid && (
                     <label className="row-index">
-                      <span>
-                        {manual
-                          ? (playlist?.tracks.indexOf(track.id) || 0) + 1
-                          : start + i + 1}
-                      </span>
+                      <span>{start + i + 1}</span>
                       <input
                         aria-label={`${t("select")} ${track.title || track.filename}`}
                         type="checkbox"
@@ -1609,10 +1391,9 @@ function Browse({
                       className="song-art"
                       aria-label={`${t("play")} ${track.title || track.filename}`}
                       onClick={() =>
-                        player.replace(
-                          tracks,
-                          tracks.findIndex((t) => t.id === track.id),
-                          section === "albums" && detail ? "album" : "track",
+                        playQuery(
+                          { ...pageQuery, start: track.id },
+                          isAlbumDetail ? "album" : "track",
                         )
                       }
                       disabled={track.missing}

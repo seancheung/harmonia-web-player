@@ -1,50 +1,29 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, Play } from "lucide-react";
-import { useMemo } from "react";
+import { type HomePageData, playBrowse } from "./browse-api";
 import { Cover, IconButton } from "./components";
 import { useApp } from "./context";
 import type { TextKey } from "./i18n";
 import { LibrarySkeleton } from "./library-skeleton";
 import { splitMembers as splitTagMembers, type Track } from "./model";
+import { usePage } from "./page-cache";
 import { player } from "./player";
 import { ThemeToggle } from "./theme-toggle";
 
 export function HomePage() {
-  const { lib, t, busy, error, reload } = useApp();
+  const { lib, t, notice } = useApp();
+  const {
+    data,
+    loading: busy,
+    error,
+    refresh: reload,
+  } = usePage<HomePageData>("/home");
   const splitMembers = (text: string) =>
     splitTagMembers(text, lib.tagSeparators || "");
-  const tracks = lib.tracks.filter((track) => !track.missing);
-  const unheard = useMemo(() => {
-    const candidates = lib.tracks.filter(
-      (track) => !track.missing && track.playCount === 0,
-    );
-    for (let i = candidates.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-    }
-    return candidates.slice(0, 8);
-  }, [lib.tracks]);
-  const recent = [...tracks].sort((a, b) => b.addedAt - a.addedAt).slice(0, 8);
-  const frequent = tracks
-    .filter((track) => track.playCount > 0)
-    .sort((a, b) => b.playCount - a.playCount || b.lastPlayed - a.lastPlayed)
-    .slice(0, 8);
-  const artists = new Map<
-    string,
-    { name: string; count: number; track: Track }
-  >();
-  for (const track of tracks) {
-    if (!track.playCount) continue;
-    for (const name of new Set(splitMembers(track.artist))) {
-      const key = name.toLowerCase();
-      const artist = artists.get(key);
-      if (artist) artist.count += track.playCount;
-      else artists.set(key, { name, count: track.playCount, track });
-    }
-  }
-  const topArtists = [...artists.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8);
+  const recent = data?.recent || [],
+    frequent = data?.frequent || [],
+    unheard = data?.unheard || [],
+    topArtists = data?.artists || [];
   const songSection = (title: TextKey, songs: Track[]) => (
     <section className="home-section" aria-label={t(title)}>
       <div className="home-section-heading">
@@ -121,7 +100,7 @@ export function HomePage() {
       <div className="page-content home-page">
         {busy ? (
           <LibrarySkeleton variant="home" label={t("loadingLibrary")} />
-        ) : error ? (
+        ) : error && !data ? (
           <div role="alert">
             <p>{t(error as TextKey) || error}</p>
             <button
@@ -132,7 +111,7 @@ export function HomePage() {
               {t("retry")}
             </button>
           </div>
-        ) : !tracks.length ? (
+        ) : !data?.total ? (
           <div className="empty-state">
             <h2>{t("empty")}</h2>
             <p>{t("emptyHint")}</p>
@@ -171,7 +150,7 @@ export function HomePage() {
                         to="/$section/$detail"
                         params={{ section: "artists", detail: artist.name }}
                       >
-                        <Cover track={artist.track} />
+                        <Cover track={artist.tracks[0]} />
                       </Link>
                       <div className="group-copy">
                         <Link
@@ -184,15 +163,10 @@ export function HomePage() {
                       <IconButton
                         label={`${t("play")} ${artist.name}`}
                         onClick={() =>
-                          player.replace(
-                            tracks.filter((track) =>
-                              splitMembers(track.artist).some(
-                                (name) =>
-                                  name.toLowerCase() ===
-                                  artist.name.toLowerCase(),
-                              ),
-                            ),
-                          )
+                          void playBrowse({
+                            section: "artists",
+                            detail: artist.id,
+                          }).catch((e) => notice(e.message))
                         }
                       >
                         <Play size={18} />

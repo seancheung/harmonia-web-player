@@ -59,7 +59,7 @@ export function PlayerBar() {
       label={t("favorite")}
       active={track?.favorite}
       disabled={!track}
-      onClick={() => track && void setFavorite(track.id, !track.favorite)}
+      onClick={() => track && void setFavorite(track.id, !track.favorite, track.favorite)}
     >
       <Heart size={18} fill={track?.favorite ? "currentColor" : "none"} />
     </FavoriteButton>

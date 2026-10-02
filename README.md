@@ -169,7 +169,7 @@ src/
   styles.css      Responsive theme and layout
 ```
 
-Library metadata is bootstrapped as a complete snapshot and grouped/paged in the browser. Sorting and filtering therefore cover all results before pagination; this approach trades simplicity for memory proportional to collection size. The server also exposes a paginated track-query API for future larger-library clients.
+Library screens request only their own server-filtered and paginated data. No full music-library snapshot is downloaded, even at startup.
 
 ## Deployment validation
 
@@ -190,4 +190,11 @@ Enable **Use waveform seek bar** at the end of client appearance settings to rep
 
 Playlist list refreshes require `GET /api/playlists?type=all|normal|smart`. The playlist browser requests `all`; the add-to-playlist picker requests `normal` while displaying cached choices immediately. Deploy the updated server before these clients.
 
-Library initialization uses `/api/library` once per server connection. Subsequent refreshes, playback statistics, scans and settings changes use `/api/library/changes` and merge changed/deleted tracks locally. Visible tabs synchronize every 30 seconds and on returning to the foreground. Unchanged responses preserve the existing track array. Only initialization, connection changes or an explicit server cursor reset request a full snapshot; network failures retain the current snapshot. This requires the incremental-sync server API. A browser reload starts a new in-memory session.
+
+## Page cache and bounded playback
+
+Startup fetches `/api/config` and the visible page. Home uses `/api/home`; collection lists, details, search, favorites and history use `/api/browse`. Pages are filtered and sorted on the server before pagination. Playlist pickers use `/api/playlists?type=normal`, without music data or full playlist membership.
+
+Page metadata is persisted per server, token and complete query, limited to 120 entries and approximately 20 MB. Cached content appears immediately, followed by silent ETag revalidation. Failed refreshes retain cached data. Visible clients check `/api/library/version` every 30 seconds and revalidate on returning to the foreground and after mutations. No full-library fallback is used. Audio is streamed, not cached for offline playback.
+
+Play all resolves the selection through `/api/queue/query`, capped at **100 songs by the server**, then fetches metadata only for those IDs. Selecting a song begins the capped queue at that song, including songs beyond the first browse page. Deploy the matching page API server before these clients; legacy servers are not supported by this data path.

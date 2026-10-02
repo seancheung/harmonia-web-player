@@ -81,9 +81,7 @@ export interface RuleSet {
   rules: Conversion[];
 }
 export interface Library {
-  syncCursor?: string;
   sources: Source[];
-  tracks: Track[];
   playlists: Playlist[];
   ruleSets: RuleSet[];
   cacheLimit: number;

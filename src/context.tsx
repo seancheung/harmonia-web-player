@@ -10,19 +10,17 @@ import {
 import { errorMessage } from "./errors";
 import { FavoriteUpdates } from "./favorite-updates";
 import { en, type TextKey, zh } from "./i18n";
-import { syncLibrary } from "./library-sync";
 import {
   api,
   defaults,
-  fetchPlaylists,
   type Library,
   load,
   type Playlist,
   type Preferences,
   save,
 } from "./model";
+import { cachedPage, fetchPage, invalidatePages } from "./page-cache";
 import { player } from "./player";
-import { useSmartPlaylists } from "./smart-playlists";
 
 interface Context {
   lib: Library;
@@ -38,11 +36,12 @@ interface Context {
     fn: () => Promise<unknown>,
     scope?: "library" | "playlists",
   ) => Promise<boolean>;
-  setFavorite: (id: string, favorite: boolean) => Promise<void>;
+  setFavorite: (
+    id: string,
+    favorite: boolean,
+    initial?: boolean,
+  ) => Promise<void>;
   savePlaylist: (playlist: Partial<Playlist>, id?: string) => Promise<boolean>;
-  smartPlaylists: Record<string, string[]>;
-  playlistsRefreshing: boolean;
-  playlistError: string;
 }
 const Ctx = createContext<Context | null>(null);
 export const useApp = () => {
@@ -53,7 +52,6 @@ export const useApp = () => {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [lib, setLib] = useState<Library>({
     sources: [],
-    tracks: [],
     playlists: [],
     ruleSets: [],
     cacheLimit: 0,
@@ -65,8 +63,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(true);
-  const libRef = useRef(lib);
-  libRef.current = lib;
   const reloadVersion = useRef(0);
   const libraryConnection = useRef("");
   const playlistVersion = useRef(0);
@@ -75,24 +71,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     favoriteUpdates.current = new FavoriteUpdates(
       (id, favorite) => api(`/tracks/${id}/favorite`, "PUT", { favorite }),
       (id, favorite) => {
-        setLib((current) => ({
-          ...current,
-          tracks: current.tracks.map((track) =>
-            track.id === id ? { ...track, favorite } : track,
-          ),
-        }));
         player.setFavorite(id, favorite);
       },
     );
   }
-  const [serverRevision, setServerRevision] = useState(0);
-  const [favoriteRevision, setFavoriteRevision] = useState(0);
+
   const pendingFavorites = useRef(0);
-  const playlistState = useSmartPlaylists(
-    lib.playlists,
-    serverRevision,
-    favoriteRevision,
-  );
   const favorites = favoriteUpdates.current;
   const t = (key: TextKey) => (prefs.language === "zh" ? zh : en)[key];
   const setPrefs = (patch: Partial<Preferences>) => {
@@ -101,37 +85,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updatePrefs(next);
   };
   async function reload(throwOnError = false) {
-    const version = favorites.version;
     const request = ++reloadVersion.current;
-    const playlistsAtStart = playlistVersion.current;
     try {
       const connection = load("preferences", defaults);
       const key = JSON.stringify([connection.api, connection.token]);
-      const previous = libRef.current;
-      const data = await syncLibrary(
-        libraryConnection.current === key
-          ? previous
-          : { ...previous, syncCursor: undefined },
-      );
+      const changedConnection = libraryConnection.current !== key;
+      if (changedConnection)
+        setLib({
+          playlists: [],
+          sources: [],
+          ruleSets: [],
+          tagSeparators: "",
+          cacheLimit: 0,
+        });
+      const cached = await cachedPage<Library>("/config");
+      if (
+        request === reloadVersion.current &&
+        cached &&
+        libraryConnection.current !== key
+      ) {
+        setLib({ ...cached, playlists: [] });
+        setBusy(false);
+      }
+      const data = await fetchPage<Library>("/config");
       if (request !== reloadVersion.current) return;
       const latest = load("preferences", defaults);
       if (key !== JSON.stringify([latest.api, latest.token])) return;
       libraryConnection.current = key;
-      if (data === previous) {
-        setError("");
-        return;
-      }
-      const tracksChanged = data.tracks !== previous.tracks;
-      data.tracks = tracksChanged
-        ? favorites.merge(data.tracks, version)
-        : libRef.current.tracks;
-      if (playlistsAtStart !== playlistVersion.current)
-        data.playlists = libRef.current.playlists;
-      libRef.current = data;
-      setLib(data);
-      setServerRevision((revision) => revision + 1);
-      if (tracksChanged) player.reconcile(data.tracks);
+      setLib((current) => ({
+        ...data,
+        playlists: changedConnection ? [] : current.playlists,
+      }));
       setError("");
+      invalidatePages();
     } catch (e) {
       if (request !== reloadVersion.current) return;
       setError(errorMessage(e));
@@ -145,7 +131,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const connection = load("preferences", defaults);
     const key = JSON.stringify([connection.api, connection.token]);
     try {
-      const playlists = await fetchPlaylists(type);
+      const path = `/playlists?type=${type}`;
+      const cached = await cachedPage<{ playlists: Playlist[] }>(path);
+      if (
+        cached &&
+        request === playlistVersion.current &&
+        key ===
+          JSON.stringify([
+            load("preferences", defaults).api,
+            load("preferences", defaults).token,
+          ])
+      ) {
+        setLib((current) => ({
+          ...current,
+          playlists:
+            type === "all"
+              ? cached.playlists
+              : [
+                  ...current.playlists.filter((p) =>
+                    type === "normal" ? p.smart : !p.smart,
+                  ),
+                  ...cached.playlists,
+                ],
+        }));
+      }
+      const { playlists } = await fetchPage<{ playlists: Playlist[] }>(path);
       const latest = load("preferences", defaults);
       if (
         request !== playlistVersion.current ||
@@ -164,14 +174,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 ...playlists,
               ],
       }));
-      setServerRevision((revision) => revision + 1);
+      invalidatePages();
     } catch (e) {
       if (request === playlistVersion.current) setToast(errorMessage(e));
     }
   }
-  async function setFavorite(id: string, favorite: boolean) {
+  async function setFavorite(
+    id: string,
+    favorite: boolean,
+    previous?: boolean,
+  ) {
     const initial =
-      libRef.current.tracks.find((track) => track.id === id)?.favorite ?? false;
+      previous ??
+      player.snapshot().queue.find((track) => track.id === id)?.favorite ??
+      false;
     try {
       pendingFavorites.current++;
       await favorites.set(id, favorite, initial);
@@ -179,8 +195,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const message = errorMessage(e);
       setToast(t(message as TextKey) || message);
     } finally {
-      if (--pendingFavorites.current === 0)
-        setFavoriteRevision((revision) => revision + 1);
+      if (--pendingFavorites.current === 0) invalidatePages();
     }
   }
   async function savePlaylist(playlist: Partial<Playlist>, id?: string) {
@@ -191,7 +206,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         playlist,
       );
       playlistVersion.current++;
-      // Save completes independently of background membership calculation.
+      // Saves invalidate page responses without downloading membership maps.
       reloadVersion.current++;
       startTransition(() =>
         setLib((current) => ({
@@ -201,6 +216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             : [...current.playlists, saved],
         })),
       );
+      invalidatePages();
       return true;
     } catch (e) {
       const message = errorMessage(e);
@@ -229,8 +245,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void reload();
     void player.syncRemote();
     const listener = () => void reload();
-    const foreground = () => {
-      if (document.visibilityState === "visible") void reload();
+    let version = "";
+    const foreground = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const next = await fetchPage<{ version: string }>("/library/version");
+        if (next.version !== version) {
+          version = next.version;
+          await reload();
+        }
+      } catch {}
     };
     const timer = window.setInterval(foreground, 30000);
     window.addEventListener("harmonia:library", listener);
@@ -302,7 +326,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         run,
         setFavorite,
         savePlaylist,
-        ...playlistState,
       }}
     >
       {children}

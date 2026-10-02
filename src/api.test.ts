@@ -18,7 +18,7 @@ it.each(["", "http://server:8090"])(
           }),
       ),
     );
-    await expect(api("/library")).rejects.toThrow(
+    await expect(api("/config")).rejects.toThrow(
       server ? "apiInvalidResponse" : "apiServerUnconfigured",
     );
   },
@@ -36,7 +36,7 @@ it("preserves structured server errors", async () => {
         }),
     ),
   );
-  await expect(api("/library")).rejects.toThrow("apiServerUnconfigured");
+  await expect(api("/config")).rejects.toThrow("apiServerUnconfigured");
 });
 
 it.each(["all", "normal", "smart"] as const)(
