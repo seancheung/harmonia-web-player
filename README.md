@@ -187,3 +187,7 @@ The next ordinary library scan rereads metadata created by older versions once, 
 ### Waveform seek bar
 
 Enable **Use waveform seek bar** at the end of client appearance settings to replace the regular seek bar with an audio waveform. It is off by default and saved in the current browser. The player keeps the regular bar while loading or if waveform generation is unavailable. Seeking and AirPlay playback remain supported. Update both the server and web player to use this feature.
+
+Playlist list refreshes require `GET /api/playlists?type=all|normal|smart`. The playlist browser requests `all`; the add-to-playlist picker requests `normal` while displaying cached choices immediately. Deploy the updated server before these clients.
+
+Library initialization uses `/api/library` once per server connection. Subsequent refreshes, playback statistics, scans and settings changes use `/api/library/changes` and merge changed/deleted tracks locally. Visible tabs synchronize every 30 seconds and on returning to the foreground. Unchanged responses preserve the existing track array. Only initialization, connection changes or an explicit server cursor reset request a full snapshot; network failures retain the current snapshot. This requires the incremental-sync server API. A browser reload starts a new in-memory session.

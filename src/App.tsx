@@ -453,6 +453,7 @@ function Browse({
     error,
     busy,
     reload,
+    reloadPlaylists,
     run,
     notice,
     setFavorite,
@@ -460,6 +461,7 @@ function Browse({
     playlistsRefreshing,
     playlistError,
   } = useApp();
+  const runPlaylist = (fn: () => Promise<unknown>) => run(fn, "playlists");
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [extraColumns, setExtraColumns] = useState<SongColumn[]>(() => {
     const stored = load<unknown>("songColumns", []);
@@ -534,6 +536,12 @@ function Browse({
   const [editing, setEditing] = useState<Playlist>();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState<Track[]>();
+  useEffect(() => {
+    if (adding) void reloadPlaylists("normal");
+  }, [adding]);
+  useEffect(() => {
+    if (section === "playlists") void reloadPlaylists("all");
+  }, [section]);
   const [details, setDetails] = useState<Track>();
   const [detailAlbums, setDetailAlbums] = useState(
     section === "artists" || section === "genres",
@@ -945,7 +953,7 @@ function Browse({
                     String((playlist?.tracks.indexOf(track.id) || 0) + 1),
                   );
                   if (pos)
-                    void run(() =>
+                    void runPlaylist(() =>
                       api(`/playlists/${detail}/items`, "POST", {
                         action: "move",
                         ids: [track.id],
@@ -960,7 +968,7 @@ function Browse({
               <button
                 type="button"
                 onClick={() => {
-                  void run(() =>
+                  void runPlaylist(() =>
                     api(`/playlists/${detail}/items`, "POST", {
                       action: "remove",
                       ids: [track.id],
@@ -1086,7 +1094,7 @@ function Browse({
                         <button
                           type="button"
                           onClick={() => {
-                            void run(() =>
+                            void runPlaylist(() =>
                               api(`/playlists/${detail}/items`, "POST", {
                                 action: "clean",
                                 ids: [],
@@ -1102,7 +1110,7 @@ function Browse({
                         type="button"
                         onClick={() => {
                           if (confirm(t("deletePlaylistHint")))
-                            void run(() =>
+                            void runPlaylist(() =>
                               api(`/playlists/${detail}`, "DELETE"),
                             );
                           close();
@@ -1261,7 +1269,7 @@ function Browse({
               onChange={(sort, desc) => {
                 if (playlist?.smart) {
                   setPage(1);
-                  void run(() =>
+                  void runPlaylist(() =>
                     api(`/playlists/${playlist.id}`, "PUT", {
                       ...playlist,
                       sort,
@@ -1763,7 +1771,7 @@ function Browse({
                     key={p.id}
                     onClick={async () => {
                       if (
-                        await run(() =>
+                        await runPlaylist(() =>
                           api(`/playlists/${p.id}/items`, "POST", {
                             action: "add",
                             ids: adding.map((t) => t.id),

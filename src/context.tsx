@@ -10,9 +10,11 @@ import {
 import { errorMessage } from "./errors";
 import { FavoriteUpdates } from "./favorite-updates";
 import { en, type TextKey, zh } from "./i18n";
+import { syncLibrary } from "./library-sync";
 import {
   api,
   defaults,
+  fetchPlaylists,
   type Library,
   load,
   type Playlist,
@@ -27,11 +29,15 @@ interface Context {
   prefs: Preferences;
   setPrefs: (p: Partial<Preferences>) => void;
   reload: (throwOnError?: boolean) => Promise<void>;
+  reloadPlaylists: (type?: "all" | "normal" | "smart") => Promise<void>;
   t: (key: TextKey) => string;
   notice: (text: string) => void;
   error: string;
   busy: boolean;
-  run: (fn: () => Promise<unknown>) => Promise<boolean>;
+  run: (
+    fn: () => Promise<unknown>,
+    scope?: "library" | "playlists",
+  ) => Promise<boolean>;
   setFavorite: (id: string, favorite: boolean) => Promise<void>;
   savePlaylist: (playlist: Partial<Playlist>, id?: string) => Promise<boolean>;
   smartPlaylists: Record<string, string[]>;
@@ -62,6 +68,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const libRef = useRef(lib);
   libRef.current = lib;
   const reloadVersion = useRef(0);
+  const libraryConnection = useRef("");
+  const playlistVersion = useRef(0);
   const favoriteUpdates = useRef<FavoriteUpdates>();
   if (!favoriteUpdates.current) {
     favoriteUpdates.current = new FavoriteUpdates(
@@ -95,13 +103,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   async function reload(throwOnError = false) {
     const version = favorites.version;
     const request = ++reloadVersion.current;
+    const playlistsAtStart = playlistVersion.current;
     try {
-      const data = await api<Library>("/library");
+      const connection = load("preferences", defaults);
+      const key = JSON.stringify([connection.api, connection.token]);
+      const previous = libRef.current;
+      const data = await syncLibrary(
+        libraryConnection.current === key
+          ? previous
+          : { ...previous, syncCursor: undefined },
+      );
       if (request !== reloadVersion.current) return;
-      data.tracks = favorites.merge(data.tracks, version);
+      const latest = load("preferences", defaults);
+      if (key !== JSON.stringify([latest.api, latest.token])) return;
+      libraryConnection.current = key;
+      if (data === previous) {
+        setError("");
+        return;
+      }
+      const tracksChanged = data.tracks !== previous.tracks;
+      data.tracks = tracksChanged
+        ? favorites.merge(data.tracks, version)
+        : libRef.current.tracks;
+      if (playlistsAtStart !== playlistVersion.current)
+        data.playlists = libRef.current.playlists;
+      libRef.current = data;
       setLib(data);
       setServerRevision((revision) => revision + 1);
-      player.reconcile(data.tracks);
+      if (tracksChanged) player.reconcile(data.tracks);
       setError("");
     } catch (e) {
       if (request !== reloadVersion.current) return;
@@ -109,6 +138,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (throwOnError) throw e;
     } finally {
       if (request === reloadVersion.current) setBusy(false);
+    }
+  }
+  async function reloadPlaylists(type: "all" | "normal" | "smart" = "all") {
+    const request = ++playlistVersion.current;
+    const connection = load("preferences", defaults);
+    const key = JSON.stringify([connection.api, connection.token]);
+    try {
+      const playlists = await fetchPlaylists(type);
+      const latest = load("preferences", defaults);
+      if (
+        request !== playlistVersion.current ||
+        key !== JSON.stringify([latest.api, latest.token])
+      )
+        return;
+      setLib((current) => ({
+        ...current,
+        playlists:
+          type === "all"
+            ? playlists
+            : [
+                ...current.playlists.filter((p) =>
+                  type === "normal" ? p.smart : !p.smart,
+                ),
+                ...playlists,
+              ],
+      }));
+      setServerRevision((revision) => revision + 1);
+    } catch (e) {
+      if (request === playlistVersion.current) setToast(errorMessage(e));
     }
   }
   async function setFavorite(id: string, favorite: boolean) {
@@ -132,6 +190,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id ? "PUT" : "POST",
         playlist,
       );
+      playlistVersion.current++;
       // Save completes independently of background membership calculation.
       reloadVersion.current++;
       startTransition(() =>
@@ -149,10 +208,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return false;
     }
   }
-  async function run(fn: () => Promise<unknown>) {
+  async function run(
+    fn: () => Promise<unknown>,
+    scope: "library" | "playlists" = "library",
+  ) {
     try {
       await fn();
-      setTimeout(() => void reload(), 0);
+      setTimeout(
+        () => void (scope === "playlists" ? reloadPlaylists() : reload()),
+        0,
+      );
       return true;
     } catch (e) {
       const message = errorMessage(e);
@@ -164,8 +229,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void reload();
     void player.syncRemote();
     const listener = () => void reload();
+    const foreground = () => {
+      if (document.visibilityState === "visible") void reload();
+    };
+    const timer = window.setInterval(foreground, 30000);
     window.addEventListener("harmonia:library", listener);
-    return () => window.removeEventListener("harmonia:library", listener);
+    document.addEventListener("visibilitychange", foreground);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("harmonia:library", listener);
+      document.removeEventListener("visibilitychange", foreground);
+    };
   }, []);
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -220,6 +294,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         prefs,
         setPrefs,
         reload,
+        reloadPlaylists,
         t,
         notice: setToast,
         error,

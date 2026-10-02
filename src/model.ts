@@ -81,6 +81,7 @@ export interface RuleSet {
   rules: Conversion[];
 }
 export interface Library {
+  syncCursor?: string;
   sources: Source[];
   tracks: Track[];
   playlists: Playlist[];
@@ -363,4 +364,15 @@ export function lyricsLines(text: string) {
       lines.push({ time: null, text: line });
   }
   return lines.sort((a, b) => (a.time ?? Infinity) - (b.time ?? Infinity));
+}
+
+export type PlaylistFilter = "all" | "normal" | "smart";
+
+export async function fetchPlaylists(
+  type: PlaylistFilter = "all",
+): Promise<Playlist[]> {
+  const response = await api<{ playlists: Playlist[] }>(
+    `/playlists?type=${type}`,
+  );
+  return response.playlists;
 }
