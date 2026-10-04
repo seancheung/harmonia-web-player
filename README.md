@@ -198,3 +198,5 @@ Startup fetches `/api/config` and the visible page. Home uses `/api/home`; colle
 Page metadata is persisted per server, token and complete query, limited to 120 entries and approximately 20 MB. Cached content appears immediately, followed by silent ETag revalidation. Failed refreshes retain cached data. Visible clients check `/api/library/version` every 30 seconds and revalidate on returning to the foreground and after mutations. No full-library fallback is used. Audio is streamed, not cached for offline playback.
 
 Play all resolves the selection through `/api/queue/query`, capped at **100 songs by the server**, then fetches metadata only for those IDs. Selecting a song begins the capped queue at that song, including songs beyond the first browse page. Deploy the matching page API server before these clients; legacy servers are not supported by this data path.
+
+Web 设置中的“OwnTone 转换规则”为服务端统一配置，默认原始音质，可选择已有转换规则。它独立于客户端本机播放设置，下次发起 OwnTone 播放时生效；没有跟随客户端选项。被选中的规则需先解除选用才能删除。回放增益仍可能触发必要的转码。

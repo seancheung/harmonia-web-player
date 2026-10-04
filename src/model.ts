@@ -84,6 +84,7 @@ export interface Library {
   sources: Source[];
   playlists: Playlist[];
   ruleSets: RuleSet[];
+  ownToneRuleSet?: string;
   cacheLimit: number;
   tagSeparators?: string;
 }

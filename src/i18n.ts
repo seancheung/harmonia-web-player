@@ -3,6 +3,9 @@ export const en = {
   songColumnsHint:
     "Choose extra columns for song lists. Saved only in this browser; scroll horizontally on smaller screens.",
   switchToTheme: "Switch to",
+  ownToneConversion: "OwnTone conversion rule",
+  ownToneConversionHint:
+    "Server-wide setting, independent of client playback quality. Defaults to original audio and applies when starting a new OwnTone queue. Change this selection before deleting its rule. ReplayGain may still require conversion.",
   waveformProgress: "Use waveform seek bar",
   sourceNameExists:
     "A music source with this name already exists. Choose a different name.",
@@ -326,6 +329,9 @@ export const zh: Record<TextKey, string> = {
   songColumnsHint:
     "选择歌曲列表的附加信息列，仅保存在当前浏览器。窄屏可横向滚动查看。",
   switchToTheme: "切换为",
+  ownToneConversion: "OwnTone 转换规则",
+  ownToneConversionHint:
+    "服务端统一设置，与客户端播放音质无关，默认原始音质；下次发起 OwnTone 播放时生效。删除所选规则前请先修改此设置。回放增益仍可能触发转码。",
   waveformProgress: "使用波形播放进度条",
   sourceNameExists: "音乐来源名称已存在，请使用其他名称。",
   songInformation: "歌曲信息",
