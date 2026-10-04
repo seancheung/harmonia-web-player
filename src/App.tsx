@@ -485,11 +485,16 @@ function Browse({
   };
   const splitMembers = (text: string) =>
     splitTagMembers(text, lib.tagSeparators || "");
+  const albumDetail = section === "albums" && !!detail;
+  const viewPreferenceKey = albumDetail
+    ? "view.albums.detail"
+    : `view.${section}`;
   const [view, setView] = useState<ViewPrefs>(() => ({
-    ...load<ViewPrefs>(`view.${section}`, {
+    ...load<ViewPrefs>(viewPreferenceKey, {
       grid: ["albums", "artists"].includes(section),
-      sort:
-        section === "folders"
+      sort: albumDetail
+        ? "number"
+        : section === "folders"
           ? "filename"
           : section === "albums" || section === "artists"
             ? "title"
@@ -568,7 +573,7 @@ function Browse({
   const updateView = (patch: Partial<ViewPrefs>) => {
     setView((v) => {
       const next = { ...v, ...patch };
-      save(`view.${section}`, next);
+      save(viewPreferenceKey, next);
       return next;
     });
     if (
@@ -1275,7 +1280,12 @@ function Browse({
                       {
                         section: groupType,
                         detail: group.id,
-                        sort: groupType === "folders" ? viewSort : "disc",
+                        sort:
+                          groupType === "folders"
+                            ? viewSort
+                            : groupType === "albums"
+                              ? "number"
+                              : "disc",
                         desc: groupType === "folders" ? view.desc : false,
                         recursive: groupType === "folders",
                       },
