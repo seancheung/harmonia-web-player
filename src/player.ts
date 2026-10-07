@@ -22,6 +22,7 @@ export interface Playback {
   index: number;
   position: number;
   volume: number;
+  volumeKnown?: boolean;
   shuffle: boolean;
   repeat: "off" | "all" | "single";
   playing: boolean;
@@ -777,7 +778,7 @@ export class Player {
     else this.persist();
   }
   volume(volume: number) {
-    this.emit({ volume });
+    this.emit({ volume, volumeKnown: true });
     if (this.state.remote)
       void this.remote({ action: "volume", volume: Math.round(volume * 100) });
     else this.applyGain();
@@ -1007,10 +1008,22 @@ export class Player {
     this.remoteVersion = "";
     const startVersion = ++this.remoteStartVersion;
     const transfer = { ...this.state };
+    if (outputs) {
+      playing = false;
+      transfer.position = 0;
+      transfer.deadline = 0;
+      transfer.waiting = false;
+      transfer.finish = false;
+    }
     this.dispose();
-    this.emit({ playing: false, loading: true });
+    this.emit({
+      playing: false,
+      loading: true,
+      ...(outputs ? { volumeKnown: false } : {}),
+    });
     try {
       if (outputs) await this.remote({ action: "outputs", outputs });
+      if (startVersion !== this.remoteStartVersion) return;
       if (!transfer.queue.length) {
         this.remoteStarting = false;
         this.emit({
@@ -1041,6 +1054,7 @@ export class Player {
         protect: p.protect,
       });
       if (startVersion !== this.remoteStartVersion || result?.cancelled) return;
+      if (outputs) await this.remote({ action: "stop" });
       this.remoteStarting = false;
       await this.syncRemote(true);
       this.emit({ remote: true, loading: false });
@@ -1103,7 +1117,7 @@ export class Player {
           item_progress_ms?: number;
           repeat?: "off" | "all" | "single";
           shuffle?: boolean;
-          volume?: number;
+          volume?: number | null;
         };
         queue?: Track[];
         queueVersion?: string;
@@ -1150,7 +1164,7 @@ export class Player {
       }
       this.emit({
         ...(s.queue ? { queue: s.queue } : {}),
-        ...(s.player.state === "play" ? { loading: false } : {}),
+        loading: s.player.state === "loading",
         index: s.index,
         gainContext: s.gainContext === "album" ? "album" : "track",
         repeat: this.repeatPending
@@ -1158,9 +1172,8 @@ export class Player {
           : (s.player.repeat ?? this.state.repeat),
         shuffle: s.player.shuffle ?? this.state.shuffle,
         volume:
-          s.player.volume !== undefined
-            ? s.player.volume / 100
-            : this.state.volume,
+          s.player.volume != null ? s.player.volume / 100 : this.state.volume,
+        volumeKnown: s.player.volume != null,
         playing: s.player.state === "play",
         position: (s.player.item_progress_ms ?? 0) / 1000,
         deadline: s.deadline,

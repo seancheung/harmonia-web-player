@@ -122,7 +122,7 @@ docker compose up -d
 
 To stop them, run `docker compose down`. Keep the deployment directory and project name unchanged so the same data volume is reused. Do not add `--volumes` unless you intend to delete the stored library data. Existing deployments with a different data volume must explicitly reuse that volume; this example does not migrate it.
 
-AirPlay additionally requires an OwnTone instance. Add `HARMONIA_OWNTONE` and `HARMONIA_PUBLIC_URL` under the server's environment; the public URL must be reachable from OwnTone, for example `http://192.168.1.20:8090`.
+AirPlay 2 playback is sent directly by Harmonia to one receiver on the server’s LAN. The server needs multicast discovery and receiver-reachable timing/audio ports. No separate AirPlay service is configured.
 
 ## Features
 
@@ -133,7 +133,7 @@ AirPlay additionally requires an OwnTone instance. Add `HARMONIA_OWNTONE` and `H
 - A persistent player with queue editing, random/repeat modes, progress, volume, lyrics and sleep timers.
 - Browser Web Audio ReplayGain with album fallback, preamp and peak protection.
 - Server conversion-rule selection and cache/source administration.
-- OwnTone-backed device discovery, pairing, multiple AirPlay outputs and remote playback control.
+- Native AirPlay 2 device discovery, two-step PIN pairing, single-output selection and remote playback control.
 - English/Simplified Chinese resources, light/dark/system themes and custom colors.
 
 All Chinese source text lives in `src/i18n.ts`. Comments, identifiers and documentation use English.
@@ -175,7 +175,7 @@ Library screens request only their own server-filtered and paginated data. No fu
 
 GitHub Actions runs `npm ci`, Biome, unit tests, production build and a Docker build entirely from this repository. CI uploads `dist` as an artifact. Pushes to `main` and `v*` tags also publish multi-platform images to `ghcr.io/seancheung/harmonia-web-player`; pull requests only build and test. Publishing an image does not deploy a running site.
 
-Browser FLAC playback and the source/scan/browse flow can be checked against the server's Docker image without personal music. Physical AirPlay devices, PIN pairing, multiroom synchronization and transport-specific gapless playback require a configured OwnTone instance and actual target speakers. Unavailable devices are reported explicitly.
+Browser FLAC playback and the source/scan/browse flow can be checked against the server's Docker image without personal music. Physical AirPlay 2 playback and PIN pairing still require hardware acceptance tests. The native sender supports one output; session changes are not gapless. Unavailable devices are reported explicitly.
 
 
 ### Native multi-value tags
@@ -198,5 +198,3 @@ Startup fetches `/api/config` and the visible page. Home uses `/api/home`; colle
 Page metadata is persisted per server, token and complete query, limited to 120 entries and approximately 20 MB. Cached content appears immediately, followed by silent ETag revalidation. Failed refreshes retain cached data. Visible clients check `/api/library/version` every 30 seconds and revalidate on returning to the foreground and after mutations. No full-library fallback is used. Audio is streamed, not cached for offline playback.
 
 Play all resolves the selection through `/api/queue/query`, capped at **100 songs by the server**, then fetches metadata only for those IDs. Selecting a song begins the capped queue at that song, including songs beyond the first browse page. Deploy the matching page API server before these clients; legacy servers are not supported by this data path.
-
-Web 设置中的“OwnTone 转换规则”为服务端统一配置，默认原始音质，可选择已有转换规则。它独立于客户端本机播放设置，下次发起 OwnTone 播放时生效；没有跟随客户端选项。被选中的规则需先解除选用才能删除。回放增益仍可能触发必要的转码。

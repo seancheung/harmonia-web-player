@@ -1977,6 +1977,76 @@ a.song-album:hover {
 .output-option span:last-child {
   margin-left: auto;
 }
+.output-discovery {
+  margin-top: 24px;
+  margin-bottom: 20px;
+}
+.output-discovery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 550;
+}
+.output-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0 5px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.output-refresh:hover:not(:disabled) {
+  color: var(--text);
+}
+.output-refresh:disabled {
+  opacity: 0.5;
+}
+.output-discovery-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 88px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 4%, transparent);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.output-discovery-status > svg {
+  flex-shrink: 0;
+}
+.output-discovery-status p {
+  margin: 0;
+}
+.output-discovery-status small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.output-discovery-error {
+  border-style: dashed;
+}
+.output-discovery .check {
+  margin: 4px 0;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.output-discovery .check .help {
+  margin: 0;
+  font-size: 11px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .output-discovery-status .spin {
+    animation: none;
+  }
+}
 .device-row {
   display: flex;
   justify-content: space-between;

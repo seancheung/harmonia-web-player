@@ -3,9 +3,6 @@ export const en = {
   songColumnsHint:
     "Choose extra columns for song lists. Saved only in this browser; scroll horizontally on smaller screens.",
   switchToTheme: "Switch to",
-  ownToneConversion: "OwnTone conversion rule",
-  ownToneConversionHint:
-    "Server-wide setting, independent of client playback quality. Defaults to original audio and applies when starting a new OwnTone queue. Change this selection before deleting its rule. ReplayGain may still require conversion.",
   waveformProgress: "Use waveform seek bar",
   sourceNameExists:
     "A music source with this name already exists. Choose a different name.",
@@ -277,11 +274,12 @@ export const en = {
   selected: "selected",
   allSelected: "Select all results",
   select: "Select",
+  airplayUnsupported: "Unsupported receiver capabilities",
   airplayHint:
-    "OwnTone must run on the speakers’ network. Its independent playback continues after this page closes. Pair devices using their displayed PIN.",
+    "Select one AirPlay 2 device on the server’s network. Verification is only needed when the receiver requires a PIN.",
   airplayUnavailable: "AirPlay is not configured or available",
   airplayQueueUnknown:
-    "AirPlay queue status is uncertain. Wait and check OwnTone before retrying. Details are in the console.",
+    "AirPlay queue status is uncertain. Check the server playback status before retrying. Details are in the console.",
   requestTimeout:
     "The request timed out. Please check the connection. Details are in the console.",
   errorDetails: "The operation failed. See the console for details.",
@@ -314,6 +312,11 @@ export const en = {
   timerSet: "Sleep timer set",
   total: "Total",
   privacy: "A private space for your music.",
+  searchingDevices: "Searching for AirPlay devices…",
+  searchDevicesAgain: "Search again",
+  deviceSearchFailed: "Couldn’t search for devices",
+  noDevicesHint:
+    "Make sure the receiver is on and connected to the server’s network.",
   noDevices: "No AirPlay devices found",
   fullText: "Full tag text",
   tag: "Other tag",
@@ -329,9 +332,6 @@ export const zh: Record<TextKey, string> = {
   songColumnsHint:
     "选择歌曲列表的附加信息列，仅保存在当前浏览器。窄屏可横向滚动查看。",
   switchToTheme: "切换为",
-  ownToneConversion: "OwnTone 转换规则",
-  ownToneConversionHint:
-    "服务端统一设置，与客户端播放音质无关，默认原始音质；下次发起 OwnTone 播放时生效。删除所选规则前请先修改此设置。回放增益仍可能触发转码。",
   waveformProgress: "使用波形播放进度条",
   sourceNameExists: "音乐来源名称已存在，请使用其他名称。",
   songInformation: "歌曲信息",
@@ -595,11 +595,12 @@ export const zh: Record<TextKey, string> = {
   selected: "已选择",
   allSelected: "选择全部结果",
   select: "选择",
+  airplayUnsupported: "暂不支持此接收端",
   airplayHint:
-    "OwnTone 需运行在音响所在网络。独立播放可在关闭网页后继续；需要配对时输入设备显示的 PIN。",
+    "选择与服务端同一网络中的一台 AirPlay 2 设备，默认直接连接。仅当设备要求 PIN 验证时才需要配对。",
   airplayUnavailable: "AirPlay 尚未配置或不可用",
   airplayQueueUnknown:
-    "AirPlay 入队结果尚未确认，请稍候查看 OwnTone 后再重试。详细信息见控制台。",
+    "AirPlay 入队结果尚未确认，请检查服务端播放状态后再重试。详细信息见控制台。",
   requestTimeout: "请求超时，请检查连接。详细信息见控制台。",
   errorDetails: "操作失败，详细信息见控制台。",
   pair: "配对",
@@ -630,6 +631,10 @@ export const zh: Record<TextKey, string> = {
   timerSet: "已设置睡眠定时器",
   total: "共",
   privacy: "专属于你的音乐空间。",
+  searchingDevices: "正在搜索 AirPlay 设备…",
+  searchDevicesAgain: "重新搜索",
+  deviceSearchFailed: "设备搜索失败",
+  noDevicesHint: "请确认接收设备已开启，并与服务端连接同一网络。",
   noDevices: "未发现 AirPlay 设备",
   fullText: "完整标签文本",
   tag: "其他标签",

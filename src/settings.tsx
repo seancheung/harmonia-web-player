@@ -60,7 +60,6 @@ const blankConversion = (): Conversion => ({
 export function SettingsPage() {
   const { t, lib, prefs, setPrefs, reload, run, notice } = useApp();
   const [source, setSource] = useState<Partial<Source>>();
-  const [savingOwnTone, setSavingOwnTone] = useState(false);
   const [ruleSet, setRuleSet] = useState<Partial<RuleSet>>();
   const [scan, setScan] = useState<Scan>();
   const [cache, setCache] = useState<Cache>();
@@ -554,30 +553,6 @@ export function SettingsPage() {
               </button>
             </div>
             <p className="help">{t("conversionHint")}</p>
-            <label htmlFor="setting-owntone-rule">
-              {t("ownToneConversion")}
-              <Select
-                id="setting-owntone-rule"
-                value={lib.ownToneRuleSet || ""}
-                disabled={savingOwnTone}
-                onChange={(event) => {
-                  const ruleSet = event.target.value;
-                  setSavingOwnTone(true);
-                  void run(() =>
-                    api("/owntone-settings", "PUT", { ruleSet }),
-                  ).finally(() => setSavingOwnTone(false));
-                }}
-              >
-                <SelectOption value="">{t("noConversion")}</SelectOption>
-                {lib.ruleSets.map((rule) => (
-                  <SelectOption key={rule.id} value={rule.id}>
-                    {rule.name}
-                  </SelectOption>
-                ))}
-              </Select>
-            </label>
-            <p className="help">{t("ownToneConversionHint")}</p>
-
             {lib.ruleSets.map((s) => (
               <div className="source-card" key={s.id}>
                 <strong>{s.name}</strong>
@@ -593,7 +568,6 @@ export function SettingsPage() {
                 </button>
                 <IconButton
                   label={t("delete")}
-                  disabled={lib.ownToneRuleSet === s.id}
                   onClick={() =>
                     void run(() => api(`/rule-sets/${s.id}`, "DELETE"))
                   }

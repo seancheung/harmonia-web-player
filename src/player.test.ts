@@ -239,7 +239,7 @@ describe("player behavior", () => {
     expect(attempts).toBe(2);
   });
   it.each([false, true])(
-    "preserves playing=%s when transferring to AirPlay",
+    "stops playback when selecting AirPlay (previously playing=%s)",
     async (playing) => {
       const p = new Player();
       p.state = {
@@ -255,11 +255,12 @@ describe("player behavior", () => {
       expect(remote).toHaveBeenCalledWith(
         expect.objectContaining({
           action: "start",
-          playing,
+          playing: false,
           index: 1,
-          position: 1250,
+          position: 0,
         }),
       );
+      expect(remote).toHaveBeenCalledWith({ action: "stop" });
     },
   );
   it("keeps the selected album track through stale remote updates", async () => {
@@ -344,6 +345,25 @@ describe("player behavior", () => {
       expect(commands).toContainEqual({ action: "volume", volume: 40 });
     },
   );
+  it("marks unreadable device volume unknown without overwriting it", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        configured: true,
+        player: { state: "stop", volume: null },
+        index: 0,
+        deadline: 0,
+        waiting: false,
+        finish: false,
+        error: "",
+      }),
+    } as Response);
+    const p = new Player();
+    p.state = { ...p.state, remote: true, volume: 0.9, volumeKnown: true };
+    await p.syncRemote();
+    expect(p.state.volumeKnown).toBe(false);
+    expect(p.state.playing).toBe(false);
+  });
   it("selects remote outputs before a song and sends later playback to them", async () => {
     const p = new Player();
     const remote = vi.spyOn(p, "remote").mockResolvedValue(undefined);

@@ -19,7 +19,13 @@ import { useEffect, useRef, useState } from "react";
 import { useApp } from "./context";
 import { player } from "./player";
 
-export function VolumeControl({ volume }: { volume: number }) {
+export function VolumeControl({
+  volume,
+  known = true,
+}: {
+  volume: number;
+  known?: boolean;
+}) {
   const { t } = useApp();
   const previous = useRef(volume > 0 ? volume : 0.75);
   useEffect(() => {
@@ -50,11 +56,15 @@ export function VolumeControl({ volume }: { volume: number }) {
         type="button"
         className="icon-button"
         ref={refs.setReference}
-        aria-label={t(volume === 0 ? "unmute" : "mute")}
+        aria-label={t(!known ? "volume" : volume === 0 ? "unmute" : "mute")}
         title={t("volume")}
-        aria-pressed={volume === 0}
+        aria-pressed={known && volume === 0}
         {...getReferenceProps({
           onClick: () => {
+            if (!known) {
+              setOpen(true);
+              return;
+            }
             if (volume > 0) previous.current = volume;
             player.volume(volume === 0 ? previous.current : 0);
           },
@@ -63,7 +73,7 @@ export function VolumeControl({ volume }: { volume: number }) {
           },
         })}
       >
-        {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+        {known && volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
       </button>
       {isMounted && (
         <FloatingPortal>
@@ -81,18 +91,20 @@ export function VolumeControl({ volume }: { volume: number }) {
               {...getFloatingProps()}
             >
               <div className="volume-popup" style={styles}>
-                <span>{Math.round(volume * 100)}%</span>
+                <span>{known ? `${Math.round(volume * 100)}%` : "—"}</span>
                 <input
                   type="range"
                   aria-label={t("volume")}
                   aria-orientation="vertical"
-                  aria-valuetext={`${Math.round(volume * 100)}%`}
+                  aria-valuetext={known ? `${Math.round(volume * 100)}%` : "—"}
                   min="0"
                   max="1"
                   step="0.01"
-                  value={volume}
+                  value={known ? volume : 0}
                   style={
-                    { "--volume": `${volume * 100}%` } as React.CSSProperties
+                    {
+                      "--volume": `${(known ? volume : 0) * 100}%`,
+                    } as React.CSSProperties
                   }
                   onChange={(event) =>
                     player.volume(Number(event.currentTarget.value))
