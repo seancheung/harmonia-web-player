@@ -9,6 +9,7 @@ import {
   save,
   type Track,
 } from "./model";
+import { ShufflePlayback } from "./shuffle-playback";
 import {
   prefersMediaElement,
   SystemMedia,
@@ -80,6 +81,21 @@ export class Player {
   private controller: AbortController | null = null;
   private preloadController: AbortController | null = null;
   private failed = new Set<string>();
+  private shufflePlayback = new ShufflePlayback();
+  private resetShuffle() {
+    this.shufflePlayback = new ShufflePlayback();
+    const track = this.state.queue[this.state.index];
+    if (track) this.shufflePlayback.select(track.id);
+  }
+  private playableIDs() {
+    return this.state.queue
+      .filter((t) => !t.missing && !this.failed.has(t.id))
+      .map((t) => t.id);
+  }
+  private advanceShuffle(index: number) {
+    if (this.state.shuffle && !this.state.remote)
+      this.shufflePlayback.advance(this.state.queue[index].id);
+  }
   private session = "";
   private listened = 0;
   private seeked = false;
@@ -101,6 +117,7 @@ export class Player {
   private lastRemoteError = "";
   private remoteSync: Promise<void> | null = null;
   constructor() {
+    this.resetShuffle();
     if (typeof window === "undefined") return;
     this.systemMedia = new SystemMedia({
       play: () => {
@@ -264,7 +281,10 @@ export class Player {
     });
     this.persist();
     if (this.state.remote) void this.startRemote(undefined, true);
-    else void this.play(true);
+    else {
+      this.resetShuffle();
+      void this.play(true);
+    }
   }
   reconcile(tracks: Track[]) {
     const byID = new Map(tracks.map((t) => [t.id, t]));
@@ -460,18 +480,26 @@ export class Player {
     if (!queue.length) return -1;
     if (!manual && repeat === "single" && !this.failed.has(queue[index].id))
       return index;
-    const valid = queue
-      .map((t, i) => ({ t, i }))
-      .filter(
-        ({ t, i }) =>
-          !t.missing &&
-          !this.failed.has(t.id) &&
-          (i !== index || queue.length === 1),
-      );
-    if (shuffle)
+    if (shuffle && this.state.remote) {
+      const valid = queue
+        .map((t, i) => ({ t, i }))
+        .filter(
+          ({ t, i }) =>
+            !t.missing &&
+            !this.failed.has(t.id) &&
+            (i !== index || queue.length === 1),
+        );
       return valid.length
         ? valid[Math.floor(Math.random() * valid.length)].i
         : -1;
+    }
+    if (shuffle) {
+      const id = this.shufflePlayback.peek(
+        this.playableIDs(),
+        repeat === "all",
+      );
+      return id === undefined ? -1 : queue.findIndex((t) => t.id === id);
+    }
     for (let i = index + 1; i < queue.length; i++)
       if (!queue[i].missing && !this.failed.has(queue[i].id)) return i;
     if (repeat === "all")
@@ -552,6 +580,7 @@ export class Player {
       this.pause();
       return;
     }
+    if (this.state.repeat !== "single") this.advanceShuffle(next);
     if (scheduled && this.nextBuffer && this.context && this.currentBuffer) {
       const when = this.start + this.currentBuffer.duration - this.offset;
       this.source?.disconnect();
@@ -595,6 +624,7 @@ export class Player {
     if (!stop && !blocked && !unsupported && this.prefs().failure === "skip") {
       const next = this.candidate(true);
       if (next >= 0) {
+        this.advanceShuffle(next);
         this.emit({ index: next, position: 0 });
         void this.play(true);
         return;
@@ -629,7 +659,11 @@ export class Player {
     this.cancelEndTimer();
     this.emit({ index, position: 0 });
     if (this.state.remote) this.selectRemote(index);
-    else void this.play(true);
+    else {
+      if (this.state.shuffle)
+        this.shufflePlayback.select(this.state.queue[index].id);
+      void this.play(true);
+    }
   }
   private selectRemote(index: number) {
     const version = ++this.remoteSelectionVersion;
@@ -657,13 +691,40 @@ export class Player {
     this.remoteSelecting = false;
   }
   next() {
+    if (this.state.remote) {
+      const next = this.candidate(true);
+      if (next >= 0) this.select(next);
+      else this.pause();
+      return;
+    }
     const next = this.candidate(true);
-    if (next >= 0) this.select(next);
-    else this.pause();
+    if (next >= 0) {
+      this.advanceShuffle(next);
+      this.cancelEndTimer();
+      this.emit({ index: next, position: 0 });
+      void this.play(true);
+    } else this.pause();
   }
   previous() {
+    if (this.state.remote) {
+      if (this.state.position > 3) this.seek(0);
+      else this.select(Math.max(0, this.state.index - 1));
+      return;
+    }
     if (this.state.position > 3) this.seek(0);
-    else this.select(Math.max(0, this.state.index - 1));
+    else if (this.state.shuffle) {
+      const id = this.shufflePlayback.previous(this.playableIDs());
+      if (id === undefined) {
+        this.seek(0);
+        return;
+      }
+      this.cancelEndTimer();
+      this.emit({
+        index: this.state.queue.findIndex((t) => t.id === id),
+        position: 0,
+      });
+      void this.play(true);
+    } else this.select(Math.max(0, this.state.index - 1));
   }
   seek(position: number) {
     if (!Number.isFinite(position)) return;
@@ -745,7 +806,10 @@ export class Player {
     this.emit({ shuffle: !this.state.shuffle });
     if (this.state.remote)
       void this.remote({ action: "shuffle", shuffle: this.state.shuffle });
-    else void this.preload();
+    else {
+      this.resetShuffle();
+      void this.preload();
+    }
     this.persist();
   }
   add(tracks: Track[], next = false) {
@@ -757,6 +821,7 @@ export class Player {
       }).catch(() => {});
       return;
     }
+    const wasEmpty = !this.state.queue.length;
     const queue = [...this.state.queue];
     queue.splice(
       next ? this.state.index + 1 : queue.length,
@@ -764,6 +829,7 @@ export class Player {
       ...tracks.filter((t) => !t.missing),
     );
     this.emit({ queue });
+    if (wasEmpty) this.resetShuffle();
     void this.preload();
     this.persist();
   }
@@ -796,6 +862,16 @@ export class Player {
         index: Math.min(index, Math.max(0, queue.length - 1)),
         position: 0,
       });
+      if (this.state.shuffle) {
+        const next = this.shufflePlayback.peek(
+          this.playableIDs(),
+          this.state.repeat === "all",
+        );
+        if (next !== undefined) {
+          this.shufflePlayback.advance(next);
+          this.emit({ index: queue.findIndex((t) => t.id === next) });
+        }
+      }
     } else
       this.emit({
         queue: this.state.queue.filter((_, i) => i !== index),
@@ -815,6 +891,7 @@ export class Player {
     }
     this.pause();
     this.emit({ queue: [], index: 0, position: 0 });
+    this.resetShuffle();
     this.persist();
   }
   timer(minutes: number, finish: boolean, end = false) {
@@ -994,6 +1071,7 @@ export class Player {
         waiting: transfer.waiting,
         finish: transfer.finish,
       });
+      this.resetShuffle();
       this.persist();
     } catch {
       /* Keep the remote output selected when stopping it fails. */

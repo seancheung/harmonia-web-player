@@ -739,3 +739,50 @@ describe("player behavior", () => {
     expect(restored.state.playing).toBe(false);
   });
 });
+
+describe("local shuffle integration", () => {
+  it("preloads and plays a complete round without repeats", async () => {
+    const p = new Player();
+    p.shuffle();
+    p.replace(["a", "b", "c", "d"].map(track));
+    await flush();
+    const played = [p.state.queue[p.state.index].id];
+    for (let i = 0; i < 3; i++) {
+      await vi.advanceTimersByTimeAsync(2000);
+      played.push(p.state.queue[p.state.index].id);
+    }
+    expect(new Set(played).size).toBe(4);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(p.state.playing).toBe(false);
+    p.clear();
+  });
+
+  it("keeps manual navigation, history, and queue edits consistent", async () => {
+    const p = new Player();
+    p.shuffle();
+    p.replace(["a", "b", "c"].map(track));
+    await flush();
+    p.next();
+    await flush();
+    const second = p.state.queue[p.state.index].id;
+    p.previous();
+    await flush();
+    expect(p.state.queue[p.state.index].id).toBe("a");
+    p.next();
+    await flush();
+    expect(p.state.queue[p.state.index].id).toBe(second);
+    const unplayed = p.state.queue.findIndex(
+      (t) => t.id !== "a" && t.id !== second,
+    );
+    p.remove(unplayed);
+    p.add([track("d")]);
+    p.move(p.state.index, 0);
+    await flush();
+    p.next();
+    await flush();
+    expect(p.state.queue[p.state.index].id).toBe("d");
+    p.next();
+    expect(p.state.playing).toBe(false);
+    p.clear();
+  });
+});
