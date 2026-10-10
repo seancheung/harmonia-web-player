@@ -1,4 +1,6 @@
 export const en = {
+  playlistDuplicateTracks:
+    "A song is already in this playlist or selected more than once. No songs were added. Remove the duplicate and try again.",
   songColumns: "Additional columns",
   songColumnsHint:
     "Choose extra columns for song lists. Saved only in this browser; scroll horizontally on smaller screens.",
@@ -334,6 +336,8 @@ export const zh: Record<TextKey, string> = {
   switchToTheme: "切换为",
   waveformProgress: "使用波形播放进度条",
   sourceNameExists: "音乐来源名称已存在，请使用其他名称。",
+  playlistDuplicateTracks:
+    "歌曲已在此播放列表中，或被重复选择。本次未添加任何歌曲，请移除重复项后重试。",
   songInformation: "歌曲信息",
   audioAndFile: "音频与文件",
   audioFormat: "格式",

@@ -7,6 +7,7 @@ export function errorMessage(error: unknown): string {
     "$1[redacted]",
   );
   console.error("[Harmonia]", detail);
+  if (/^duplicate track:/.test(message)) return "playlistDuplicateTracks";
   if (/queue outcome unknown/i.test(message)) return "airplayQueueUnknown";
   if (/deadline exceeded|timeout|timed out/i.test(message))
     return "requestTimeout";

@@ -23,6 +23,7 @@ import { cachedPage, fetchPage, invalidatePages } from "./page-cache";
 import { player } from "./player";
 
 interface Context {
+  airplayAvailable: boolean;
   lib: Library;
   prefs: Preferences;
   setPrefs: (p: Partial<Preferences>) => void;
@@ -63,6 +64,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(true);
+  const [airplayAvailable, setAirplayAvailable] = useState(false);
   const reloadVersion = useRef(0);
   const libraryConnection = useRef("");
   const playlistVersion = useRef(0);
@@ -90,6 +92,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const connection = load("preferences", defaults);
       const key = JSON.stringify([connection.api, connection.token]);
       const changedConnection = libraryConnection.current !== key;
+      if (changedConnection) setAirplayAvailable(false);
       if (changedConnection)
         setLib({
           playlists: [],
@@ -107,11 +110,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setLib({ ...cached, playlists: [] });
         setBusy(false);
       }
-      const data = await fetchPage<Library>("/config");
+      const [data, capabilities] = await Promise.all([
+        fetchPage<Library>("/config"),
+        api<{ airplay: boolean }>("/capabilities").catch(() => ({ airplay: false })),
+      ]);
       if (request !== reloadVersion.current) return;
       const latest = load("preferences", defaults);
       if (key !== JSON.stringify([latest.api, latest.token])) return;
       libraryConnection.current = key;
+      setAirplayAvailable(capabilities.airplay === true);
       setLib((current) => ({
         ...data,
         playlists: changedConnection ? [] : current.playlists,
@@ -314,6 +321,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider
       value={{
+        airplayAvailable,
         lib,
         prefs,
         setPrefs,

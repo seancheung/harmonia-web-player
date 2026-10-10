@@ -35,7 +35,7 @@ import { VolumeControl } from "./volume-control";
 
 export function PlayerBar() {
   const s = useSyncExternalStore(player.subscribe, player.snapshot);
-  const { t, run, setFavorite } = useApp();
+  const { t, run, setFavorite, airplayAvailable } = useApp();
   const [panel, setPanel] = useState<
     "queue" | "lyrics" | "output" | "sleep" | null
   >(null);
@@ -58,6 +58,10 @@ export function PlayerBar() {
   const [deviceSearch, setDeviceSearch] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [pin, setPin] = useState("");
+  useEffect(() => {
+    if (!airplayAvailable)
+      setPanel((current) => (current === "output" ? null : current));
+  }, [airplayAvailable]);
   const [pairID, setPairID] = useState("");
   const track = s.queue[s.index];
   const favoriteButton = (
@@ -288,7 +292,8 @@ export function PlayerBar() {
           </IconButton>
           <IconButton
             label={`${t("output")}: ${t(s.remote ? "output" : "local")}`}
-            active={s.remote}
+            active={s.remote && airplayAvailable}
+            disabled={!airplayAvailable}
             onClick={() => {
               setDevicesLoading(true);
               setDeviceError("");
