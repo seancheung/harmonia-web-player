@@ -666,14 +666,18 @@ export class Player {
       void this.play(true);
     }
   }
-  private selectRemote(index: number) {
+  private selectRemote(index: number, action: "select" | "next" = "select") {
     const version = ++this.remoteSelectionVersion;
     this.remoteSelecting = true;
     this.remoteSelections = this.remoteSelections.then(async () => {
       if (version !== this.remoteSelectionVersion) return;
       let error = "";
       try {
-        await api("/remote", "POST", { action: "select", index });
+        await api(
+          "/remote",
+          "POST",
+          action === "next" ? { action } : { action, index },
+        );
       } catch (e) {
         error = errorMessage(e);
         this.remoteVersion = "";
@@ -693,9 +697,15 @@ export class Player {
   }
   next() {
     if (this.state.remote) {
-      const next = this.candidate(true);
-      if (next >= 0) this.select(next);
-      else this.pause();
+      if (this.state.shuffle) {
+        this.cancelEndTimer();
+        this.emit({ position: 0 });
+        this.selectRemote(this.state.index, "next");
+      } else {
+        const next = this.candidate(true);
+        if (next >= 0) this.select(next);
+        else this.pause();
+      }
       return;
     }
     const next = this.candidate(true);

@@ -112,7 +112,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const [data, capabilities] = await Promise.all([
         fetchPage<Library>("/config"),
-        api<{ airplay: boolean }>("/capabilities").catch(() => ({ airplay: false })),
+        api<{ airplay: boolean }>("/capabilities").catch(() => ({
+          airplay: false,
+        })),
       ]);
       if (request !== reloadVersion.current) return;
       const latest = load("preferences", defaults);

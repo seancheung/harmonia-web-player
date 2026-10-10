@@ -761,6 +761,61 @@ describe("player behavior", () => {
 });
 
 describe("local shuffle integration", () => {
+  it("delegates AirPlay shuffle next to the server instead of selecting a random index", async () => {
+    const p = new Player();
+    p.state = {
+      ...p.state,
+      remote: true,
+      shuffle: true,
+      repeat: "all",
+      queue: [track("a"), track("b"), track("c")],
+    };
+    vi.mocked(fetch).mockImplementation(
+      async (_url, options) =>
+        ({
+          ok: true,
+          json: async () =>
+            options?.method === "POST"
+              ? { ok: true }
+              : {
+                  configured: true,
+                  index: 2,
+                  player: { state: "play" },
+                },
+        }) as Response,
+    );
+    p.next();
+    await flush();
+    const writes = vi
+      .mocked(fetch)
+      .mock.calls.filter(([, options]) => options?.method === "POST");
+    expect(writes).toHaveLength(1);
+    expect(JSON.parse(String(writes[0][1]?.body))).toEqual({ action: "next" });
+    expect(p.state.index).toBe(2);
+  });
+
+  it("plays unique complete rounds with shuffle and repeat all enabled", async () => {
+    const p = new Player();
+    p.shuffle();
+    p.repeat();
+    p.replace(["a", "b", "c", "d"].map(track));
+    await flush();
+    let previous: string | undefined;
+    for (let round = 0; round < 10; round++) {
+      const played: string[] = [];
+      for (let i = 0; i < 4; i++) {
+        const id = p.state.queue[p.state.index].id;
+        expect(id).not.toBe(previous);
+        played.push(id);
+        previous = id;
+        await vi.advanceTimersByTimeAsync(2000);
+      }
+      expect(new Set(played).size).toBe(4);
+      expect(p.state.playing).toBe(true);
+    }
+    p.clear();
+  });
+
   it("preloads and plays a complete round without repeats", async () => {
     const p = new Player();
     p.shuffle();
