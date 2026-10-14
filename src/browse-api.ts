@@ -56,16 +56,25 @@ export const browsePath = (query: BrowseQuery) =>
 export async function playBrowse(
   query: BrowseQuery,
   mode: "album" | "track" = "track",
+  shuffled = false,
 ) {
   const { ids } = await api<{ ids: string[] }>(
-    `/queue/query?query=${encodeURIComponent(JSON.stringify(query))}`,
+    `/queue/query?query=${encodeURIComponent(JSON.stringify(shuffled ? { ...query, start: undefined } : query))}`,
   );
-  const { items } = await api<{ items: Track[] }>("/tracks/resolve", "POST", {
-    ids,
-  });
-  player.replace(
-    items.filter((track) => !track.missing),
-    0,
-    mode,
-  );
+  const items: Track[] = [];
+  for (let offset = 0; offset < ids.length; offset += 200) {
+    const batch = await api<{ items: Track[] }>("/tracks/resolve", "POST", {
+      ids: ids.slice(offset, offset + 200),
+    });
+    items.push(...batch.items);
+  }
+  const tracks = items.filter((track) => !track.missing);
+  const index = shuffled
+    ? Math.floor(Math.random() * tracks.length)
+    : Math.max(
+        0,
+        tracks.findIndex((track) => track.id === query.start),
+      );
+  if (shuffled && !player.state.shuffle) player.shuffle();
+  player.replace(tracks, index, mode);
 }

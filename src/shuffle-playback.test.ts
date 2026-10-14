@@ -87,3 +87,13 @@ function required(id: string | undefined): string {
   if (id === undefined) throw new Error("Expected an upcoming track");
   return id;
 }
+
+it("keeps played markers during preloading and resets only when advancing into a new round", () => {
+  const s = new ShufflePlayback();
+  s.select("a");
+  s.select("b");
+  const next = required(s.peek(["a", "b"], true));
+  expect(s.playedIds).toEqual(["a", "b"]);
+  s.advance(next);
+  expect(s.playedIds).toEqual([next]);
+});

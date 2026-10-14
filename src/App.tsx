@@ -34,6 +34,7 @@ import {
   Search,
   Settings2,
   Shapes,
+  Shuffle,
   SlidersHorizontal,
   X,
 } from "lucide-react";
@@ -80,6 +81,7 @@ import {
 import { usePage } from "./page-cache";
 import { player } from "./player";
 import { PlayerBar } from "./player-ui";
+import { PlayingArtworkStatus } from "./playing-waveform";
 import { Select, SelectOption } from "./select";
 import { SettingsPage } from "./settings";
 import { type SongColumn, songColumns, songColumnValue } from "./song-columns";
@@ -676,8 +678,11 @@ function Browse({
     pageTracks = tracks;
   const folderExists = data?.folderExists ?? true;
   const selectedTracks = tracks.filter((track) => selected.has(track.id));
-  const playQuery = (query: BrowseQuery, mode: "album" | "track" = "track") =>
-    void playBrowse(query, mode).catch((e) => notice(e.message));
+  const playQuery = (
+    query: BrowseQuery,
+    mode: "album" | "track" = "track",
+    shuffled = false,
+  ) => void playBrowse(query, mode, shuffled).catch((e) => notice(e.message));
   useEffect(() => {
     setSelected(new Set());
   }, [page]);
@@ -873,6 +878,20 @@ function Browse({
                     {t("playAll")}
                   </button>
                 )
+              )}
+              {(data?.trackCount || 0) > 0 && (
+                <IconButton
+                  label={t("shuffle")}
+                  onClick={() =>
+                    playQuery(
+                      { ...pageQuery, recursive: section === "folders" },
+                      isAlbumDetail ? "album" : "track",
+                      true,
+                    )
+                  }
+                >
+                  <Shuffle size={18} />
+                </IconButton>
               )}
               {playlist && (
                 <Menu>
@@ -1409,17 +1428,25 @@ function Browse({
                       disabled={track.missing}
                     >
                       <Cover track={track} />
-                      <Play size={16} fill="currentColor" />
+                      {playback.queue[playback.index]?.id === track.id ? (
+                        <PlayingArtworkStatus
+                          playing={playback.playing}
+                          label={t(
+                            playback.playing ? "queuePlaying" : "queuePaused",
+                          )}
+                        />
+                      ) : (
+                        <Play size={16} fill="currentColor" />
+                      )}
                     </button>
                     <div>
                       <button
                         type="button"
                         className="song-title"
                         onClick={() =>
-                          player.replace(
-                            tracks,
-                            tracks.findIndex((t) => t.id === track.id),
-                            section === "albums" && detail ? "album" : "track",
+                          playQuery(
+                            { ...pageQuery, start: track.id },
+                            isAlbumDetail ? "album" : "track",
                           )
                         }
                         disabled={track.missing}

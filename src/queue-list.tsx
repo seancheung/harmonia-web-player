@@ -1,21 +1,27 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDown, ArrowUp, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Pause, X } from "lucide-react";
 import { memo, useEffect, useRef } from "react";
 import { Cover, IconButton } from "./components";
 import { useApp } from "./context";
 import type { Track } from "./model";
 import { player } from "./player";
+import { PlayingWaveform } from "./playing-waveform";
 
 export const QueueList = memo(function QueueList({
   queue,
   index,
+  playedIds,
+  playing,
   open,
 }: {
   queue: Track[];
   index: number;
+  playedIds: string[];
+  playing: boolean;
   open: boolean;
 }) {
   const { t } = useApp();
+  const played = new Set(playedIds);
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtual = useVirtualizer({
     count: queue.length,
@@ -38,7 +44,6 @@ export const QueueList = memo(function QueueList({
             <div
               key={row.key}
               data-index={i}
-              ref={virtual.measureElement}
               className={`queue-item ${i === index ? "is-current" : ""}`}
               style={{
                 position: "absolute",
@@ -53,7 +58,39 @@ export const QueueList = memo(function QueueList({
                 onClick={() => player.select(i)}
                 aria-current={i === index ? "true" : undefined}
               >
-                <Cover track={item} />
+                <div className="queue-artwork">
+                  <Cover track={item} />
+                  {(i === index || played.has(item.id)) && (
+                    <span
+                      className="queue-artwork-status"
+                      role="img"
+                      aria-label={t(
+                        i === index
+                          ? playing
+                            ? "queuePlaying"
+                            : "queuePaused"
+                          : "queuePlayed",
+                      )}
+                      title={t(
+                        i === index
+                          ? playing
+                            ? "queuePlaying"
+                            : "queuePaused"
+                          : "queuePlayed",
+                      )}
+                    >
+                      {i === index ? (
+                        playing ? (
+                          <PlayingWaveform />
+                        ) : (
+                          <Pause size={20} aria-hidden="true" />
+                        )
+                      ) : (
+                        <Check size={20} aria-hidden="true" />
+                      )}
+                    </span>
+                  )}
+                </div>
                 <span>
                   <strong>{item.title || item.filename}</strong>
                   <small>

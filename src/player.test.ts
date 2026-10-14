@@ -861,3 +861,57 @@ describe("local shuffle integration", () => {
     p.clear();
   });
 });
+
+it.each([0, 250, 499, 500, 649])(
+  "caps automatic playback around index %i but permits manual additions",
+  (selected) => {
+    const p = new Player();
+    const tracks = Array.from({ length: 650 }, (_, i) => track(String(i)));
+    p.replace(tracks, selected);
+    const start = Math.max(0, selected - 499);
+    expect(p.state.queue.map((t) => t.id)).toEqual(
+      tracks.slice(start, start + 500).map((t) => t.id),
+    );
+    expect(p.state.queue[p.state.index].id).toBe(String(selected));
+    p.add([track("manual")]);
+    expect(p.state.queue).toHaveLength(501);
+    expect(p.state.queue[500].id).toBe("manual");
+  },
+);
+
+it("tracks actual queue selections rather than positions and resets at the next round", () => {
+  const p = new Player();
+  p.replace([track("a"), track("b"), track("c")], 1);
+  expect(p.state.playedIds).toEqual(["b"]);
+  p.select(0);
+  expect(new Set(p.state.playedIds)).toEqual(new Set(["a", "b"]));
+  p.move(0, 2);
+  expect(new Set(p.state.playedIds)).toEqual(new Set(["a", "b"]));
+  p.repeat();
+  p.next();
+  expect(p.state.index).toBe(0);
+  expect(p.state.playedIds).toEqual(["b"]);
+  p.select(1);
+  p.shuffle();
+  expect(p.state.playedIds).toEqual(["c"]);
+  p.clear();
+  expect(p.state.playedIds).toEqual([]);
+});
+it("receives remote played state even when queue metadata is unchanged", async () => {
+  const p = new Player();
+  p.state.remote = true;
+  p.state.queue = [track("a"), track("b")];
+  vi.mocked(fetch).mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      configured: true,
+      player: { state: "play", shuffle: true },
+      index: 1,
+      playedIds: ["a", "b"],
+      queueVersion: "v1",
+    }),
+  } as Response);
+  await p.syncRemote();
+  expect(p.state.playedIds).toEqual(["a", "b"]);
+  expect(p.state.queue).toHaveLength(2);
+});

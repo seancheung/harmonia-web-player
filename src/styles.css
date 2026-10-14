@@ -1582,6 +1582,7 @@ a.song-album:hover {
   flex: 1;
 }
 .queue-item {
+  height: 68px;
   display: flex;
   align-items: center;
   padding: 8px 0;
@@ -3729,4 +3730,78 @@ button:is(.song-title, .home-title, .file-name):enabled:is(
   .song-art:enabled:is(:hover, :focus-visible, :active) > svg {
     scale: 1;
   }
+}
+
+.queue-artwork {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  overflow: hidden;
+  border-radius: 4px;
+}
+.queue-artwork .cover {
+  width: 100%;
+  height: 100%;
+}
+.queue-artwork-status {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: rgb(0 0 0 / 35%);
+  pointer-events: none;
+}
+
+/* Compact bars for the 36px cover, retaining the iOS rhythm and proportions. */
+.queue-playing-waveform {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 18px;
+  height: 18px;
+}
+.queue-playing-waveform > span {
+  width: 2.5px;
+  height: 18px;
+  flex: 0 0 2.5px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: scaleY(0.660714);
+  animation: queue-playing-wave 1.6s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+/* Interleaved phases: 0, π, π/2, 3π/2; shared duration prevents drift. */
+.queue-playing-waveform > span:nth-child(1) {
+  animation-delay: -0.4s;
+}
+.queue-playing-waveform > span:nth-child(2) {
+  animation-delay: -1.2s;
+}
+.queue-playing-waveform > span:nth-child(3) {
+  animation-delay: -0.8s;
+  transform: scaleY(1);
+}
+.queue-playing-waveform > span:nth-child(4) {
+  animation-delay: 0s;
+  transform: scaleY(0.321429);
+}
+@keyframes queue-playing-wave {
+  0%,
+  100% {
+    transform: scaleY(0.321429);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .queue-playing-waveform > span {
+    animation: none;
+  }
+}
+
+.song-playing-status {
+  border-radius: 5px;
 }

@@ -18,6 +18,7 @@ import {
 
 export interface Playback {
   queue: Track[];
+  playedIds: string[];
   gainContext: "track" | "album";
   index: number;
   position: number;
@@ -36,6 +37,7 @@ export interface Playback {
 }
 const initial: Playback = {
   queue: [],
+  playedIds: [],
   gainContext: "track",
   index: 0,
   position: 0,
@@ -87,6 +89,7 @@ export class Player {
     this.shufflePlayback = new ShufflePlayback();
     const track = this.state.queue[this.state.index];
     if (track) this.shufflePlayback.select(track.id);
+    this.emit({ playedIds: this.shufflePlayback.playedIds });
   }
   private playableIDs() {
     return this.state.queue
@@ -94,8 +97,15 @@ export class Player {
       .map((t) => t.id);
   }
   private advanceShuffle(index: number) {
-    if (this.state.shuffle && !this.state.remote)
+    if (this.state.remote) return;
+    if (this.state.shuffle) {
       this.shufflePlayback.advance(this.state.queue[index].id);
+    } else {
+      if (index === 0 && this.state.repeat === "all")
+        this.shufflePlayback = new ShufflePlayback();
+      this.shufflePlayback.select(this.state.queue[index].id);
+    }
+    this.emit({ playedIds: this.shufflePlayback.playedIds });
   }
   private session = "";
   private listened = 0;
@@ -265,7 +275,13 @@ export class Player {
   ) {
     this.failed.clear();
     const selected = tracks[index]?.id;
-    const queue = tracks.filter((t) => !t.missing);
+    const playable = tracks.filter((t) => !t.missing);
+    const selectedIndex = Math.max(
+      0,
+      playable.findIndex((t) => t.id === selected),
+    );
+    const start = Math.max(0, selectedIndex - 499);
+    const queue = playable.slice(start, start + 500);
     if (!queue.length) {
       this.emit({ error: "emptyPlaylist" });
       return;
@@ -661,8 +677,8 @@ export class Player {
     this.emit({ index, position: 0 });
     if (this.state.remote) this.selectRemote(index);
     else {
-      if (this.state.shuffle)
-        this.shufflePlayback.select(this.state.queue[index].id);
+      this.shufflePlayback.select(this.state.queue[index].id);
+      this.emit({ playedIds: this.shufflePlayback.playedIds });
       void this.play(true);
     }
   }
@@ -703,7 +719,12 @@ export class Player {
         this.selectRemote(this.state.index, "next");
       } else {
         const next = this.candidate(true);
-        if (next >= 0) this.select(next);
+        if (next >= 0 && next <= this.state.index) {
+          // Let the server advance the round when list repeat wraps.
+          this.cancelEndTimer();
+          this.emit({ index: next, position: 0 });
+          this.selectRemote(next, "next");
+        } else if (next >= 0) this.select(next);
         else this.pause();
       }
       return;
@@ -880,7 +901,10 @@ export class Player {
         );
         if (next !== undefined) {
           this.shufflePlayback.advance(next);
-          this.emit({ index: queue.findIndex((t) => t.id === next) });
+          this.emit({
+            index: queue.findIndex((t) => t.id === next),
+            playedIds: this.shufflePlayback.playedIds,
+          });
         }
       }
     } else
@@ -1131,6 +1155,7 @@ export class Player {
         };
         queue?: Track[];
         queueVersion?: string;
+        playedIds?: string[];
         gainContext?: "track" | "album";
         index: number;
         deadline: number;
@@ -1174,6 +1199,7 @@ export class Player {
       }
       this.emit({
         ...(s.queue ? { queue: s.queue } : {}),
+        playedIds: s.playedIds ?? [],
         loading: s.player.state === "loading",
         index: s.index,
         gainContext: s.gainContext === "album" ? "album" : "track",

@@ -371,6 +371,8 @@ export function PlayerBar() {
               </div>
               <QueueList
                 queue={s.queue}
+                playedIds={s.playedIds}
+                playing={s.playing}
                 index={s.index}
                 open={panel === "queue"}
               />

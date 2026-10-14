@@ -6,6 +6,10 @@ export class ShufflePlayback {
   private cursor = -1;
   private newRound = false;
 
+  get playedIds(): string[] {
+    return [...this.visited];
+  }
+
   select(id: string) {
     if (this.newRound) {
       this.visited.clear();

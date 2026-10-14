@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, Play } from "lucide-react";
+import { useSyncExternalStore } from "react";
 import { type HomePageData, playBrowse } from "./browse-api";
 import { Cover, IconButton } from "./components";
 import { useApp } from "./context";
@@ -8,10 +9,12 @@ import { LibrarySkeleton } from "./library-skeleton";
 import { splitMembers as splitTagMembers, type Track } from "./model";
 import { usePage } from "./page-cache";
 import { player } from "./player";
+import { PlayingArtworkStatus } from "./playing-waveform";
 import { ThemeToggle } from "./theme-toggle";
 
 export function HomePage() {
   const { lib, t, notice } = useApp();
+  const playback = useSyncExternalStore(player.subscribe, player.snapshot);
   const {
     data,
     loading: busy,
@@ -47,7 +50,14 @@ export function HomePage() {
                 onClick={() => player.replace(songs, index)}
               >
                 <Cover track={track} />
-                <Play size={20} fill="currentColor" aria-hidden="true" />
+                {playback.queue[playback.index]?.id === track.id ? (
+                  <PlayingArtworkStatus
+                    playing={playback.playing}
+                    label={t(playback.playing ? "queuePlaying" : "queuePaused")}
+                  />
+                ) : (
+                  <Play size={20} fill="currentColor" aria-hidden="true" />
+                )}
               </button>
               <div className="home-song-copy">
                 <button
