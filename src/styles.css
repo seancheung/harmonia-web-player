@@ -2154,6 +2154,9 @@ a.song-album:hover {
   padding: 15px 0;
   border-bottom: 1px solid var(--line);
 }
+.settings-section > .source-card:last-child {
+  border-bottom: 0;
+}
 .source-card > div {
   flex: 1;
   min-width: 0;

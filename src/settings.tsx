@@ -459,7 +459,7 @@ export function SettingsPage() {
             {!caps.ffprobe && (
               <p className="error-text">{t("probeUnavailable")}</p>
             )}
-            <div className="flex flex-wrap gap-3">
+            <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
                 className="primary"
