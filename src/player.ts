@@ -65,6 +65,13 @@ export class Player {
     playing: false,
     loading: false,
   };
+  private localModes = load<{ repeat: Playback["repeat"]; shuffle: boolean }>(
+    "playback.localModes",
+    {
+      repeat: this.state.remote ? "off" : this.state.repeat,
+      shuffle: this.state.remote ? false : this.state.shuffle,
+    },
+  );
   private listeners = new Set<() => void>();
   private context: AudioContext | null = null;
   private gain: GainNode | null = null;
@@ -114,7 +121,6 @@ export class Player {
   private lastTick = performance.now();
   private lastSave = 0;
   private remoteTick = 0;
-  private audioPreferences = "";
   private savedQueue: Track[] | null = null;
   private remoteVersion = "";
   private remoteStartVersion = 0;
@@ -156,7 +162,27 @@ export class Player {
     this.emit({ error: "", mediaDiagnostics: undefined });
   }
   private emit(patch: Partial<Playback> = {}) {
-    this.state = { ...this.state, ...patch };
+    const next = { ...this.state, ...patch };
+    if (!this.state.remote && next.remote) {
+      this.localModes = {
+        repeat: this.state.repeat,
+        shuffle: this.state.shuffle,
+      };
+      try {
+        save("playback.localModes", this.localModes);
+      } catch {}
+    } else if (this.state.remote && !next.remote) {
+      Object.assign(next, this.localModes);
+    } else if (
+      !next.remote &&
+      (next.repeat !== this.state.repeat || next.shuffle !== this.state.shuffle)
+    ) {
+      this.localModes = { repeat: next.repeat, shuffle: next.shuffle };
+      try {
+        save("playback.localModes", this.localModes);
+      } catch {}
+    }
+    this.state = next;
     this.systemMedia?.update(this.state);
     for (const fn of this.listeners) fn();
   }
@@ -199,20 +225,7 @@ export class Player {
     this.applyGain();
   }
   applyGain() {
-    const preferences = this.prefs();
-    const signature = JSON.stringify([
-      preferences.gain,
-      preferences.preamp,
-      preferences.protect,
-      preferences.ruleSet,
-    ]);
-    const changed =
-      !!this.audioPreferences && this.audioPreferences !== signature;
-    this.audioPreferences = signature;
-    if (this.state.remote && changed) {
-      void this.startRemote();
-      return;
-    }
+    if (this.state.remote) return;
     const t = this.state.queue[this.state.index];
     const factor = t
       ? replayGain(t, this.prefs(), this.state.gainContext).factor
@@ -1070,9 +1083,6 @@ export class Player {
         this.persist();
         return;
       }
-      const p = this.prefs();
-      await this.remote({ action: "repeat", repeat: this.state.repeat });
-      if (startVersion !== this.remoteStartVersion) return;
       this.emit({ remote: true });
       this.remoteStartSubmitted = true;
       const result = await this.remote({
@@ -1081,18 +1091,13 @@ export class Player {
         position: Math.round(transfer.position * 1000),
         ids: transfer.queue.map((t) => t.id),
         index: transfer.index,
-        ruleSet: p.ruleSet,
-        gain: p.gain === "auto" ? transfer.gainContext : p.gain,
         gainContext: transfer.gainContext,
-        preamp: p.preamp,
-        protect: p.protect,
       });
       if (startVersion !== this.remoteStartVersion || result?.cancelled) return;
       if (outputs) await this.remote({ action: "stop" });
       this.remoteStarting = false;
       await this.syncRemote(true);
       this.emit({ remote: true, loading: false });
-      await this.remote({ action: "shuffle", shuffle: transfer.shuffle });
       await this.remote({
         action: "timer",
         deadline: transfer.deadline,

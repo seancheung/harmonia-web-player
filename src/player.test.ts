@@ -631,7 +631,7 @@ describe("player behavior", () => {
     await starting;
     expect(
       remote.mock.calls.map(([body]) => (body as { action: string }).action),
-    ).toEqual(["repeat", "start", "clear"]);
+    ).toEqual(["start", "clear"]);
     expect(p.state.loading).toBe(false);
   });
   it("seeks repeatedly with replay gain without refetching or reverting position", async () => {
@@ -914,4 +914,63 @@ it("receives remote played state even when queue metadata is unchanged", async (
   await p.syncRemote();
   expect(p.state.playedIds).toEqual(["a", "b"]);
   expect(p.state.queue).toHaveLength(2);
+});
+
+it("does not restart AirPlay when local ReplayGain preferences change", () => {
+  const p = new Player();
+  p.state.remote = true;
+  const start = vi.spyOn(p, "startRemote").mockResolvedValue();
+  p.applyGain();
+  save("preferences", {
+    ...defaults,
+    gain: "album",
+    preamp: 6,
+    protect: false,
+  });
+  p.applyGain();
+  expect(start).not.toHaveBeenCalled();
+});
+
+it("keeps local modes across remote status updates and restores them when returning", async () => {
+  const p = new Player();
+  p.repeat();
+  p.shuffle();
+  vi.mocked(fetch).mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      configured: true,
+      player: { state: "play", repeat: "single", shuffle: false },
+      queue: [track("a")],
+      index: 0,
+    }),
+  } as Response);
+  await p.syncRemote();
+  expect(p.state.remote).toBe(true);
+  expect(p.state.repeat).toBe("single");
+  expect(p.state.shuffle).toBe(false);
+  vi.spyOn(p, "remote").mockResolvedValue({});
+  await p.local();
+  expect(p.state.repeat).toBe("all");
+  expect(p.state.shuffle).toBe(true);
+  expect(load("playback.localModes", {})).toEqual({
+    repeat: "all",
+    shuffle: true,
+  });
+});
+it("starts AirPlay without sending local modes or conversion rules", async () => {
+  const p = new Player();
+  p.state.queue = [track("a")];
+  p.repeat();
+  p.shuffle();
+  const remote = vi.spyOn(p, "remote").mockResolvedValue({});
+  vi.spyOn(p, "syncRemote").mockResolvedValue();
+  await p.startRemote(["speaker"]);
+  const commands = remote.mock.calls.map(
+    ([body]) => body as Record<string, unknown>,
+  );
+  expect(commands.map((c) => c.action)).not.toContain("repeat");
+  expect(commands.map((c) => c.action)).not.toContain("shuffle");
+  expect(commands.find((c) => c.action === "start")).not.toHaveProperty(
+    "ruleSet",
+  );
 });

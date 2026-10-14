@@ -131,7 +131,7 @@ AirPlay 2 playback is sent directly by Harmonia to one receiver on the server’
 - Recursive all/any filter groups, full-text metadata comparisons and exact source/folder conditions.
 - Ordinary and smart playlists, atomic batch additions, missing entries, cleanup and cross-page position moves.
 - A persistent player with queue editing, random/repeat modes, progress, volume, lyrics and sleep timers.
-- Browser Web Audio ReplayGain with album fallback, preamp and peak protection.
+- Browser Web Audio ReplayGain with album fallback, preamp and peak protection. A separate AirPlay server ReplayGain section saves shared server preferences; local preference changes do not affect remote playback.
 - Server conversion-rule selection and cache/source administration.
 - Native AirPlay 2 device discovery, two-step PIN pairing, single-output selection and remote playback control.
 - English/Simplified Chinese resources, light/dark/system themes and custom colors.
@@ -198,3 +198,5 @@ Startup fetches `/api/config` and the visible page. Home uses `/api/home`; colle
 Page metadata is persisted per server, token and complete query, limited to 120 entries and approximately 20 MB. Cached content appears immediately, followed by silent ETag revalidation. Failed refreshes retain cached data. Visible clients check `/api/library/version` every 30 seconds and revalidate on returning to the foreground and after mutations. No full-library fallback is used. Audio is streamed, not cached for offline playback.
 
 Play all resolves the selection through `/api/queue/query`, capped at **500 songs by the server**, then fetches metadata only for those IDs. Selecting a song preserves list order and starts at its index. The queue contains the first 500 playable songs, or the 500 ending at the selection when it is beyond that range. Manual additions can exceed 500 songs. Deploy the matching page API server before these clients; legacy servers are not supported by this data path.
+
+AirPlay keeps its own persistent repeat and shuffle modes; selecting server output reads them without copying local modes, and returning to local restores local modes. Server settings include a separate playback failure policy (Stop by default, or Skip for source/decode failures). Skip stops after all candidates fail; receiver/transport errors always stop. Clients no longer send conversion rules in AirPlay playback commands.

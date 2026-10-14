@@ -290,18 +290,19 @@ export function PlayerBar() {
           >
             <Type size={18} />
           </IconButton>
-          <IconButton
-            label={`${t("output")}: ${t(s.remote ? "output" : "local")}`}
-            active={s.remote && airplayAvailable}
-            disabled={!airplayAvailable}
-            onClick={() => {
-              setDevicesLoading(true);
-              setDeviceError("");
-              setPanel("output");
-            }}
-          >
-            <Airplay size={18} />
-          </IconButton>
+          {airplayAvailable && (
+            <IconButton
+              label={`${t("output")}: ${t(s.remote ? "output" : "local")}`}
+              active={s.remote}
+              onClick={() => {
+                setDevicesLoading(true);
+                setDeviceError("");
+                setPanel("output");
+              }}
+            >
+              <Airplay size={18} />
+            </IconButton>
+          )}
           <IconButton
             label={t("queue")}
             active={panel === "queue"}

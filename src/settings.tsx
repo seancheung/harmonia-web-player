@@ -290,7 +290,7 @@ export function SettingsPage() {
 
             <div className="settings-grid">
               <label htmlFor="setting-gain">
-                {t("gain")}
+                {t("localGain")}
                 <Select
                   id="setting-gain"
                   value={prefs.gain}
@@ -658,6 +658,9 @@ export function SettingsPage() {
               </button>
             </div>
           </section>
+          {caps.airplay && (
+            <ServerPlaybackSettings key={`${prefs.api}|${prefs.token}`} />
+          )}
         </section>
       </div>
       <DialogPresence>
@@ -947,5 +950,132 @@ export function SettingsPage() {
         )}
       </DialogPresence>
     </>
+  );
+}
+
+interface PlaybackSettings {
+  gain: string;
+  preamp: number;
+  protect: boolean;
+  failure: string;
+}
+function ServerPlaybackSettings() {
+  const { t, notice } = useApp();
+  const [settings, setSettings] = useState<PlaybackSettings>({
+    gain: "off",
+    preamp: 0,
+    protect: true,
+    failure: "stop",
+  });
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    api<PlaybackSettings>("/playback-settings")
+      .then((value) => {
+        if (active) {
+          setSettings(value);
+          setLoaded(true);
+        }
+      })
+      .catch((e) => {
+        if (active) setError(errorMessage(e));
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  async function save() {
+    if (!loaded || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const value = await api<PlaybackSettings>(
+        "/playback-settings",
+        "PUT",
+        settings,
+      );
+      setSettings(value);
+      notice(t("saved"));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="settings-section">
+      <h3>{t("serverPlaybackSettings")}</h3>
+      <div className="settings-grid">
+        <label htmlFor="server-gain">
+          {t("gain")}
+          <Select
+            id="server-gain"
+            value={settings.gain}
+            disabled={!loaded || busy}
+            onChange={(e) => setSettings({ ...settings, gain: e.target.value })}
+          >
+            {["off", "auto", "track", "album"].map((v) => (
+              <SelectOption key={v} value={v}>
+                {t(v as TextKey)}
+              </SelectOption>
+            ))}
+          </Select>
+        </label>
+        <label>
+          {t("preamp")}
+          <input
+            type="number"
+            min="-30"
+            max="30"
+            step="0.5"
+            value={settings.preamp}
+            disabled={!loaded || busy}
+            onChange={(e) =>
+              setSettings({
+                ...settings,
+                preamp: Math.max(-30, Math.min(30, Number(e.target.value))),
+              })
+            }
+          />
+        </label>
+        <label htmlFor="server-failure">
+          {t("failure")}
+          <Select
+            id="server-failure"
+            value={settings.failure}
+            disabled={!loaded || busy}
+            onChange={(e) =>
+              setSettings({ ...settings, failure: e.target.value })
+            }
+          >
+            <SelectOption value="stop">{t("stop")}</SelectOption>
+            <SelectOption value="skip">{t("skip")}</SelectOption>
+          </Select>
+        </label>
+      </div>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={settings.protect}
+          disabled={!loaded || busy}
+          onChange={(e) =>
+            setSettings({ ...settings, protect: e.target.checked })
+          }
+        />
+        {t("protect")}
+      </label>
+      {error && <p role="alert">{error}</p>}
+      <button
+        type="button"
+        className="secondary"
+        disabled={!loaded || busy}
+        aria-busy={busy}
+        onClick={() => void save()}
+      >
+        {t("save")}
+      </button>
+    </section>
   );
 }
