@@ -147,8 +147,43 @@ export function SettingsPage() {
         <section className="settings-group" aria-labelledby="client-settings">
           <header className="settings-group-heading">
             <h2 id="client-settings">{t("clientSettings")}</h2>
-            <p>{t("clientSettingsHint")}</p>
           </header>
+          <section className="settings-section">
+            <h3>{t("connection")}</h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void connect();
+              }}
+            >
+              <label>
+                {t("serverURL")}
+                <input
+                  type="url"
+                  placeholder="http://localhost:8090"
+                  value={url}
+                  onChange={(e) => setURL(e.target.value)}
+                />
+              </label>
+              <label>
+                {t("token")}
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                />
+              </label>
+              <button
+                type="submit"
+                className="primary"
+                disabled={connecting}
+                aria-busy={connecting}
+              >
+                {t(connecting ? "connecting" : "connect")}
+              </button>
+            </form>
+          </section>
           <section className="settings-section">
             <h3>{t("appearance")}</h3>
             <div className="settings-grid">
@@ -361,7 +396,6 @@ export function SettingsPage() {
               />
               {t("protect")}
             </label>
-            <p className="help">{t("gainHint")}</p>
             <button
               type="button"
               className="subtle"
@@ -372,47 +406,10 @@ export function SettingsPage() {
               {t("reset")}
             </button>
           </section>
-          <section className="settings-section">
-            <h3>{t("connection")}</h3>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void connect();
-              }}
-            >
-              <label>
-                {t("serverURL")}
-                <input
-                  type="url"
-                  placeholder="http://localhost:8090"
-                  value={url}
-                  onChange={(e) => setURL(e.target.value)}
-                />
-              </label>
-              <label>
-                {t("token")}
-                <input
-                  type="password"
-                  autoComplete="off"
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                />
-              </label>
-              <button
-                type="submit"
-                className="primary"
-                disabled={connecting}
-                aria-busy={connecting}
-              >
-                {t(connecting ? "connecting" : "connect")}
-              </button>
-            </form>
-          </section>
         </section>
         <section className="settings-group" aria-labelledby="server-settings">
           <header className="settings-group-heading">
             <h2 id="server-settings">{t("serverSettings")}</h2>
-            <p>{t("serverSettingsHint")}</p>
           </header>
           <section className="settings-section">
             <div className="section-heading">
@@ -459,7 +456,6 @@ export function SettingsPage() {
                 </div>
               ))}
             </div>
-            <p className="help">{t("scanHint")}</p>
             {!caps.ffprobe && (
               <p className="error-text">{t("probeUnavailable")}</p>
             )}
@@ -552,7 +548,6 @@ export function SettingsPage() {
                 {t("newRuleSet")}
               </button>
             </div>
-            <p className="help">{t("conversionHint")}</p>
             {lib.ruleSets.map((s) => (
               <div className="source-card" key={s.id}>
                 <strong>{s.name}</strong>
@@ -588,7 +583,6 @@ export function SettingsPage() {
                 onChange={(e) => setTagSeparators(e.target.value)}
               />
             </label>
-            <p className="help">{t("tagSeparatorsHint")}</p>
             <button
               type="button"
               className="secondary"
