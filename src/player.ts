@@ -31,6 +31,7 @@ export interface Playback {
   error: string;
   mediaDiagnostics?: string;
   remote: boolean;
+  keepLocalOutput?: boolean;
   deadline: number;
   finish: boolean;
   waiting: boolean;
@@ -151,6 +152,7 @@ export class Player {
       position: () => this.state.position,
     });
     setInterval(() => this.tick(), 200);
+    window.addEventListener("offline", () => this.serverDisconnected());
     window.addEventListener("pagehide", () => this.persist());
   }
   subscribe = (fn: () => void) => {
@@ -1042,6 +1044,10 @@ export class Player {
       await this.syncRemote(true);
       return result;
     } catch (e) {
+      if (isNetworkFailure(e)) {
+        this.serverDisconnected();
+        return { cancelled: true };
+      }
       this.remoteVersion = "";
       await this.syncRemote(true);
       this.emit({ error: errorMessage(e) });
@@ -1071,6 +1077,7 @@ export class Player {
     try {
       if (outputs) await this.remote({ action: "outputs", outputs });
       if (startVersion !== this.remoteStartVersion) return;
+      if (outputs?.length) this.emit({ keepLocalOutput: false });
       if (!transfer.queue.length) {
         this.remoteStarting = false;
         this.emit({
@@ -1095,8 +1102,10 @@ export class Player {
       });
       if (startVersion !== this.remoteStartVersion || result?.cancelled) return;
       if (outputs) await this.remote({ action: "stop" });
+      if (startVersion !== this.remoteStartVersion) return;
       this.remoteStarting = false;
       await this.syncRemote(true);
+      if (startVersion !== this.remoteStartVersion) return;
       this.emit({ remote: true, loading: false });
       await this.remote({
         action: "timer",
@@ -1110,6 +1119,31 @@ export class Player {
       if (startVersion === this.remoteStartVersion) this.remoteStarting = false;
     }
   }
+  serverDisconnected() {
+    if (!this.state.remote && !this.remoteStarting) {
+      if (!this.state.keepLocalOutput) {
+        this.emit({ keepLocalOutput: true });
+        this.persist();
+      }
+      return;
+    }
+    this.cancelRemoteSelection();
+    this.remoteStartVersion++;
+    this.remoteStarting = false;
+    this.remoteVersion = "";
+    this.emit({
+      remote: false,
+      keepLocalOutput: true,
+      playing: false,
+      loading: false,
+      error: "",
+      deadline: 0,
+      waiting: false,
+      finish: false,
+    });
+    this.resetShuffle();
+    this.persist();
+  }
   async local() {
     this.cancelRemoteSelection();
     this.remoteStartVersion++;
@@ -1119,6 +1153,7 @@ export class Player {
       await this.remote({ action: "local" });
       this.emit({
         remote: false,
+        keepLocalOutput: true,
         playing: false,
         deadline: transfer.deadline,
         waiting: transfer.waiting,
@@ -1167,7 +1202,12 @@ export class Player {
         waiting: boolean;
         finish: boolean;
         error: string;
-      }>(`/remote?queueVersion=${encodeURIComponent(this.remoteVersion)}`);
+      }>(
+        `/remote?queueVersion=${encodeURIComponent(this.remoteVersion)}`,
+        "GET",
+        undefined,
+        AbortSignal.timeout(5000),
+      );
       if (startVersion !== this.remoteStartVersion) return;
       if (
         selectionVersion !== this.remoteSelectionVersion ||
@@ -1188,6 +1228,7 @@ export class Player {
       )
         return;
       this.remoteStarting = false;
+      if (!this.state.remote && this.state.keepLocalOutput) return;
       if (!this.state.remote && s.player.state !== "play") return;
       if (!s.configured) {
         if (this.state.remote)
@@ -1233,9 +1274,17 @@ export class Player {
         this.remoteSelecting
       )
         return;
-      if (this.state.remote) this.emit({ error: errorMessage(e) });
+      if (isNetworkFailure(e)) this.serverDisconnected();
+      else if (this.state.remote) this.emit({ error: errorMessage(e) });
     }
   }
+}
+export function isNetworkFailure(error: unknown) {
+  return (
+    error instanceof TypeError ||
+    (error instanceof DOMException &&
+      ["TimeoutError", "AbortError"].includes(error.name))
+  );
 }
 export const player = new Player();
 

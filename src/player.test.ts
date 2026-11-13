@@ -974,3 +974,28 @@ it("starts AirPlay without sending local modes or conversion rules", async () =>
     "ruleSet",
   );
 });
+
+it("silently switches a remote queue to local output when the server becomes unreachable", async () => {
+  const p = new Player();
+  p.state.remote = true;
+  p.state.playing = true;
+  p.state.queue = [track("a")];
+  vi.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+  await p.syncRemote();
+  expect(p.state).toMatchObject({ remote: false, playing: false, error: "" });
+  expect(p.state.queue[0].id).toBe("a");
+  for (const client of [p, new Player()]) {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        configured: true,
+        player: { state: "play" },
+        queue: [track("other")],
+        index: 0,
+      }),
+    } as Response);
+    await client.syncRemote();
+    expect(client.state.remote).toBe(false);
+    expect(client.state.queue[0].id).toBe("a");
+  }
+});

@@ -27,15 +27,15 @@ import { Cover, FavoriteButton, IconButton, Modal } from "./components";
 import { useApp } from "./context";
 import { DialogPresence } from "./dialog-presence";
 import type { TextKey } from "./i18n";
-import { api, defaults, duration, load, lyricsLines } from "./model";
-import { player } from "./player";
+import { api, duration, lyricsLines } from "./model";
+import { isNetworkFailure, player } from "./player";
 import { QueueList } from "./queue-list";
 import { SeekControl } from "./seek-control";
 import { VolumeControl } from "./volume-control";
 
 export function PlayerBar() {
   const s = useSyncExternalStore(player.subscribe, player.snapshot);
-  const { t, run, setFavorite, airplayAvailable } = useApp();
+  const { t, setFavorite, prefs, airplayAvailable } = useApp();
   const [panel, setPanel] = useState<
     "queue" | "lyrics" | "output" | "sleep" | null
   >(null);
@@ -56,14 +56,10 @@ export function PlayerBar() {
   const [deviceError, setDeviceError] = useState("");
   const [devicesLoading, setDevicesLoading] = useState(true);
   const [deviceSearch, setDeviceSearch] = useState(0);
-  const deviceCache = useRef({ key: "", at: 0 });
   const selectionEdited = useRef(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [pin, setPin] = useState("");
-  useEffect(() => {
-    if (!airplayAvailable)
-      setPanel((current) => (current === "output" ? null : current));
-  }, [airplayAvailable]);
+  const [localOnly, setLocalOnly] = useState(true);
   const [pairID, setPairID] = useState("");
   const track = s.queue[s.index];
   const favoriteButton = (
@@ -141,22 +137,33 @@ export function PlayerBar() {
   }, [activeLine, panel]);
   useEffect(() => {
     if (panel !== "output") return;
-    const preferences = load("preferences", defaults);
-    const key = JSON.stringify([preferences.api, preferences.token]);
-    if (deviceCache.current.key !== key) {
+    setDevices([]);
+    setLocalOnly(true);
+    setPairID("");
+    const offline = () => {
       setDevices([]);
-      deviceCache.current = { key, at: 0 };
-    }
-    if (Date.now() - deviceCache.current.at < 30_000) {
+      setSelected([]);
+      setPairID("");
+      setDeviceError("");
+      setLocalOnly(true);
+      player.serverDisconnected();
+    };
+    if (navigator.onLine === false) {
+      offline();
       setDevicesLoading(false);
       return;
     }
     const controller = new AbortController();
     let disposed = false;
+    const disconnected = () => {
+      controller.abort();
+      offline();
+    };
+    window.addEventListener("offline", disconnected);
     const timeout = window.setTimeout(() => controller.abort(), 6000);
     setDevicesLoading(true);
     setDeviceError("");
-    void api<{ outputs: typeof devices; error?: string }>(
+    void api<{ outputs: typeof devices; error?: string; maxSelected?: number }>(
       "/outputs",
       "GET",
       undefined,
@@ -164,9 +171,9 @@ export function PlayerBar() {
     )
       .then((r) => {
         if (controller.signal.aborted) return;
+        setLocalOnly(r.maxSelected === 0);
         if (!r.error) {
           setDevices(r.outputs || []);
-          deviceCache.current = { key, at: Date.now() };
         }
         setDeviceError(r.error || "");
         if (!r.error && !selectionEdited.current)
@@ -177,7 +184,12 @@ export function PlayerBar() {
           );
       })
       .catch((e) => {
-        if (!disposed) setDeviceError(e.message);
+        if (disposed) return;
+        if (isNetworkFailure(e) || controller.signal.aborted) offline();
+        else {
+          setLocalOnly(false);
+          setDeviceError(e.message);
+        }
       })
       .finally(() => {
         window.clearTimeout(timeout);
@@ -185,10 +197,29 @@ export function PlayerBar() {
       });
     return () => {
       disposed = true;
+      window.removeEventListener("offline", disconnected);
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [panel, deviceSearch]);
+  }, [panel, deviceSearch, prefs.api, prefs.token, s.remote]);
+  async function pairOutput(id: string, code: string) {
+    try {
+      await api("/remote", "POST", { action: "pair", outputId: id, pin: code });
+      setPairID(code ? "" : id);
+      setPin("");
+      if (code) setDeviceSearch((n) => n + 1);
+    } catch (error) {
+      if (isNetworkFailure(error)) {
+        setLocalOnly(true);
+        setSelected([]);
+        setDevices([]);
+        setPairID("");
+        player.serverDisconnected();
+      } else {
+        setDeviceError(error instanceof Error ? error.message : String(error));
+      }
+    }
+  }
   return (
     <>
       <footer className="player-bar">
@@ -313,7 +344,7 @@ export function PlayerBar() {
           >
             <Type size={18} />
           </IconButton>
-          {airplayAvailable && (
+          {airplayAvailable !== false && (
             <IconButton
               label={`${t("output")}: ${t(s.remote ? "output" : "local")}`}
               active={s.remote}
@@ -325,6 +356,7 @@ export function PlayerBar() {
                     : [],
                 );
                 setDeviceError("");
+                setLocalOnly(true);
                 setPanel("output");
               }}
             >
@@ -526,95 +558,91 @@ export function PlayerBar() {
               <span>{t("local")}</span>
               {!selected.length && <span>✓</span>}
             </button>
-            <section className="output-discovery" aria-busy={devicesLoading}>
-              <div className="output-discovery-header">
-                <span>AirPlay</span>
-                <button
-                  type="button"
-                  className="output-refresh"
-                  disabled={devicesLoading}
-                  onClick={() => {
-                    deviceCache.current.at = 0;
-                    setDeviceSearch((n) => n + 1);
-                  }}
-                  aria-label={t("searchDevicesAgain")}
-                >
-                  <RefreshCw size={14} />
-                  {t("searchDevicesAgain")}
-                </button>
-              </div>
-              {devices.map((device) => (
-                <div className="device-row" key={device.id}>
-                  <label className="check">
-                    <input
-                      type="radio"
-                      name="airplay-output"
-                      disabled={!!device.unsupported_reason}
-                      checked={selected.includes(device.id)}
-                      onChange={(e) => {
-                        selectionEdited.current = true;
-                        setSelected(e.target.checked ? [device.id] : []);
-                      }}
-                    />
-                    <Airplay size={20} />
-                    {device.name}
-                    {device.type && <span className="help">{device.type}</span>}
-                    {device.unsupported_reason && (
-                      <span className="help" title={device.unsupported_reason}>
-                        {t("airplayUnsupported")}
-                      </span>
-                    )}
-                  </label>
-                  {device.requires_auth && !device.unsupported_reason && (
-                    <button
-                      type="button"
-                      disabled={!!device.unsupported_reason}
-                      onClick={() =>
-                        void run(async () => {
-                          await api("/remote", "POST", {
-                            action: "pair",
-                            outputId: device.id,
-                            pin: "",
-                          });
-                          setPairID(device.id);
-                          setPin("");
-                        })
-                      }
-                    >
-                      {t("pair")}
-                    </button>
-                  )}
+            {!localOnly && (
+              <section className="output-discovery" aria-busy={devicesLoading}>
+                <div className="output-discovery-header">
+                  <span>AirPlay</span>
+                  <button
+                    type="button"
+                    className="output-refresh"
+                    disabled={devicesLoading}
+                    onClick={() => {
+                      setDeviceSearch((n) => n + 1);
+                    }}
+                    aria-label={t("searchDevicesAgain")}
+                  >
+                    <RefreshCw size={14} />
+                    {t("searchDevicesAgain")}
+                  </button>
                 </div>
-              ))}
-              <div aria-live="polite" role="status">
-                {devicesLoading ? (
-                  <div className="output-discovery-status">
-                    <LoaderCircle
-                      size={20}
-                      className="spin"
-                      aria-hidden="true"
-                    />
-                    <span>{t("searchingDevices")}</span>
+                {devices.map((device) => (
+                  <div className="device-row" key={device.id}>
+                    <label className="check">
+                      <input
+                        type="radio"
+                        name="airplay-output"
+                        disabled={!!device.unsupported_reason}
+                        checked={selected.includes(device.id)}
+                        onChange={(e) => {
+                          selectionEdited.current = true;
+                          setSelected(e.target.checked ? [device.id] : []);
+                        }}
+                      />
+                      <Airplay size={20} />
+                      {device.name}
+                      {device.type && (
+                        <span className="help">{device.type}</span>
+                      )}
+                      {device.unsupported_reason && (
+                        <span
+                          className="help"
+                          title={device.unsupported_reason}
+                        >
+                          {t("airplayUnsupported")}
+                        </span>
+                      )}
+                    </label>
+                    {device.requires_auth && !device.unsupported_reason && (
+                      <button
+                        type="button"
+                        disabled={!!device.unsupported_reason}
+                        onClick={() => void pairOutput(device.id, "")}
+                      >
+                        {t("pair")}
+                      </button>
+                    )}
                   </div>
-                ) : deviceError ? (
-                  <div className="output-discovery-status output-discovery-error">
-                    <Airplay size={20} aria-hidden="true" />
-                    <div>
-                      <p>{t("deviceSearchFailed")}</p>
-                      <small>{deviceError}</small>
+                ))}
+                <div aria-live="polite" role="status">
+                  {devicesLoading ? (
+                    <div className="output-discovery-status">
+                      <LoaderCircle
+                        size={20}
+                        className="spin"
+                        aria-hidden="true"
+                      />
+                      <span>{t("searchingDevices")}</span>
                     </div>
-                  </div>
-                ) : !devices.length ? (
-                  <div className="output-discovery-status">
-                    <Airplay size={20} aria-hidden="true" />
-                    <div>
-                      <p>{t("noDevices")}</p>
-                      <small>{t("noDevicesHint")}</small>
+                  ) : deviceError ? (
+                    <div className="output-discovery-status output-discovery-error">
+                      <Airplay size={20} aria-hidden="true" />
+                      <div>
+                        <p>{t("deviceSearchFailed")}</p>
+                        <small>{deviceError}</small>
+                      </div>
                     </div>
-                  </div>
-                ) : null}
-              </div>
-            </section>
+                  ) : !devices.length ? (
+                    <div className="output-discovery-status">
+                      <Airplay size={20} aria-hidden="true" />
+                      <div>
+                        <p>{t("noDevices")}</p>
+                        <small>{t("noDevicesHint")}</small>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+            )}
             {pairID && (
               <div className="flex gap-2">
                 <input
@@ -624,30 +652,7 @@ export function PlayerBar() {
                 />
                 <button
                   type="button"
-                  onClick={() =>
-                    void run(() =>
-                      (async () => {
-                        await api("/remote", "POST", {
-                          action: "pair",
-                          outputId: pairID,
-                          pin,
-                        });
-                        setDevices((items) =>
-                          items.map((d) =>
-                            d.id === pairID
-                              ? {
-                                  ...d,
-                                  requires_auth: false,
-                                  needs_auth_key: false,
-                                }
-                              : d,
-                          ),
-                        );
-                        setPairID("");
-                        setPin("");
-                      })(),
-                    )
-                  }
+                  onClick={() => void pairOutput(pairID, pin)}
                 >
                   {t("pair")}
                 </button>

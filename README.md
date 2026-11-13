@@ -201,4 +201,4 @@ Play all resolves the selection through `/api/queue/query`, capped at **500 song
 
 AirPlay keeps its own persistent repeat and shuffle modes; selecting server output reads them without copying local modes, and returning to local restores local modes. Server settings include a separate playback failure policy (Stop by default, or Skip for source/decode failures). Skip stops after all candidates fail; receiver/transport errors always stop. Clients no longer send conversion rules in AirPlay playback commands.
 
-Playback device lists retain the last successful discovery for the current server/account. Reopening within 30 seconds reuses that list; older lists remain visible during background refresh. Manual refresh bypasses freshness. Discovery does not disable local output or cached device selection, and results never overwrite a choice made while discovery is in flight.
+Opening or refreshing the playback device picker reads the current receiver list from the server. When the server is unreachable, the picker shows only local playback and an active remote player switches to local output, paused.
