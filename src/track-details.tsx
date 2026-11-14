@@ -45,7 +45,7 @@ export function TrackDetails({
         </div>
       </div>
       <section className="track-detail-section">
-        <h4>{t("songInformation")}</h4>
+        <h4>{t("trackInformation")}</h4>
         {rows([
           ["artist", track.artist],
           ["album", track.album],

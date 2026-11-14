@@ -26,7 +26,7 @@ it("plays only the server selection, including a start beyond the visible page",
       ),
     );
   vi.stubGlobal("fetch", fetch);
-  await playBrowse({ section: "songs", page: 4, start: "150" });
+  await playBrowse({ section: "tracks", page: 4, start: "150" });
   const url = new URL(fetch.mock.calls[0][0], "http://localhost");
   expect(url.pathname).toBe("/api/queue/query");
   expect(JSON.parse(url.searchParams.get("query") ?? "{}")).toMatchObject({
@@ -54,9 +54,9 @@ it("does not replace playback when selection resolution fails", async () => {
         }),
     ),
   );
-  await expect(playBrowse({ section: "songs", start: "gone" })).rejects.toThrow(
-    "Selection changed",
-  );
+  await expect(
+    playBrowse({ section: "tracks", start: "gone" }),
+  ).rejects.toThrow("Selection changed");
   expect(player.replace).not.toHaveBeenCalled();
 });
 
@@ -74,7 +74,7 @@ it("starts shuffle at a random index without rearranging the list", async () => 
       ),
     );
   vi.stubGlobal("fetch", fetch);
-  await playBrowse({ section: "songs", start: "b" }, "album", true);
+  await playBrowse({ section: "tracks", start: "b" }, "album", true);
   const url = new URL(fetch.mock.calls[0][0], "http://localhost");
   expect(JSON.parse(url.searchParams.get("query") ?? "{}")).not.toHaveProperty(
     "start",
@@ -103,7 +103,7 @@ it("resolves 500 tracks in bounded batches while preserving order and selection"
     );
   }
   vi.stubGlobal("fetch", fetch);
-  await playBrowse({ section: "songs", start: "499" });
+  await playBrowse({ section: "tracks", start: "499" });
   expect(
     fetch.mock.calls
       .slice(1)

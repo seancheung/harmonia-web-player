@@ -42,7 +42,7 @@ it("publishes metadata and routes system controls to the player", () => {
     queue: [
       {
         id: "one",
-        title: "Song",
+        title: "Track",
         artist: "Artist",
         album: "Album",
         duration: 100,
@@ -55,7 +55,7 @@ it("publishes metadata and routes system controls to the player", () => {
   } as Playback;
   media.update(state);
   expect(session.metadata).toMatchObject({
-    title: "Song",
+    title: "Track",
     artist: "Artist",
     album: "Album",
   });

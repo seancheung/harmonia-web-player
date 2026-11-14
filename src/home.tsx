@@ -27,27 +27,27 @@ export function HomePage() {
     frequent = data?.frequent || [],
     unheard = data?.unheard || [],
     topArtists = data?.artists || [];
-  const songSection = (title: TextKey, songs: Track[]) => (
+  const trackSection = (title: TextKey, tracks: Track[]) => (
     <section className="home-section" aria-label={t(title)}>
       <div className="home-section-heading">
         <h2>{t(title)}</h2>
         <Link
           to="/$section"
-          params={{ section: "songs" }}
+          params={{ section: "tracks" }}
           search={{ preset: title }}
         >
           {t("viewAll")}
         </Link>
       </div>
-      {songs.length ? (
-        <div className="home-songs">
-          {songs.map((track, index) => (
-            <article className="home-song" key={track.id}>
+      {tracks.length ? (
+        <div className="home-tracks">
+          {tracks.map((track, index) => (
+            <article className="home-track" key={track.id}>
               <button
-                className="song-art home-cover"
+                className="track-art home-cover"
                 type="button"
                 aria-label={`${t("play")} ${track.title || track.filename}`}
-                onClick={() => player.replace(songs, index)}
+                onClick={() => player.replace(tracks, index)}
               >
                 <Cover track={track} />
                 {playback.queue[playback.index]?.id === track.id ? (
@@ -59,11 +59,11 @@ export function HomePage() {
                   <Play size={20} fill="currentColor" aria-hidden="true" />
                 )}
               </button>
-              <div className="home-song-copy">
+              <div className="home-track-copy">
                 <button
                   className="home-title"
                   type="button"
-                  onClick={() => player.replace(songs, index)}
+                  onClick={() => player.replace(tracks, index)}
                 >
                   {track.title || track.filename}
                 </button>
@@ -92,7 +92,7 @@ export function HomePage() {
         </div>
       ) : (
         <p className="home-empty">
-          {t(title === "unheard" ? "allSongsHeard" : "noListeningHistory")}
+          {t(title === "unheard" ? "allTracksHeard" : "noListeningHistory")}
         </p>
       )}
     </section>
@@ -135,8 +135,8 @@ export function HomePage() {
           </div>
         ) : (
           <>
-            {songSection("recentlyAdded", recent)}
-            {songSection("topSongs", frequent)}
+            {trackSection("recentlyAdded", recent)}
+            {trackSection("topTracks", frequent)}
             <section className="home-section" aria-label={t("topArtists")}>
               <div className="home-section-heading">
                 <h2>{t("topArtists")}</h2>
@@ -188,7 +188,7 @@ export function HomePage() {
                 <p className="home-empty">{t("noListeningHistory")}</p>
               )}
             </section>
-            {songSection("unheard", unheard)}
+            {trackSection("unheard", unheard)}
           </>
         )}
       </div>

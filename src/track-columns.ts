@@ -1,7 +1,7 @@
 import type { TextKey } from "./i18n";
 import { formatBytes, type Track } from "./model";
 
-export const songColumns = [
+export const trackColumns = [
   { id: "albumArtist", label: "albumArtist" },
   { id: "genre", label: "genre" },
   { id: "format", label: "audioFormat" },
@@ -12,10 +12,10 @@ export const songColumns = [
   { id: "lastPlayed", label: "lastPlayed" },
   { id: "size", label: "fileSize" },
 ] as const satisfies readonly { id: keyof Track; label: TextKey }[];
-export type SongColumn = (typeof songColumns)[number]["id"];
-export function songColumnValue(
+export type TrackColumn = (typeof trackColumns)[number]["id"];
+export function trackColumnValue(
   track: Track,
-  column: SongColumn,
+  column: TrackColumn,
   language: string,
 ) {
   switch (column) {

@@ -364,7 +364,7 @@ describe("player behavior", () => {
     expect(p.state.volumeKnown).toBe(false);
     expect(p.state.playing).toBe(false);
   });
-  it("selects remote outputs before a song and sends later playback to them", async () => {
+  it("selects remote outputs before a track and sends later playback to them", async () => {
     const p = new Player();
     const remote = vi.spyOn(p, "remote").mockResolvedValue(undefined);
     vi.spyOn(p, "syncRemote").mockResolvedValue(undefined);
@@ -685,7 +685,7 @@ describe("player behavior", () => {
     expect(p.state.index).toBe(2);
     p.pause();
   });
-  it("builds a complete queue and schedules the next song at the current song end", async () => {
+  it("builds a complete queue and schedules the next track at the current track end", async () => {
     const p = new Player();
     p.replace([track("one"), track("two")]);
     await flush();
@@ -723,7 +723,7 @@ describe("player behavior", () => {
     expect(p.state.position).toBe(0.5);
     expect(p.state.queue).toHaveLength(1);
   });
-  it("lets finish-current-track take priority over repeat and the next song", async () => {
+  it("lets finish-current-track take priority over repeat and the next track", async () => {
     const p = new Player();
     p.replace([track("one"), track("two")]);
     await flush();
@@ -738,7 +738,7 @@ describe("player behavior", () => {
     expect(p.state.waiting).toBe(false);
     expect(p.state.queue).toHaveLength(2);
   });
-  it("cancels end-of-song sleep on manual selection", async () => {
+  it("cancels end-of-track sleep on manual selection", async () => {
     const p = new Player();
     p.replace([track("one"), track("two")]);
     await flush();

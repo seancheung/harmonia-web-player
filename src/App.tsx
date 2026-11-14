@@ -84,15 +84,19 @@ import { PlayerBar } from "./player-ui";
 import { PlayingArtworkStatus } from "./playing-waveform";
 import { Select, SelectOption } from "./select";
 import { SettingsPage } from "./settings";
-import { type SongColumn, songColumns, songColumnValue } from "./song-columns";
 import { ThemeToggle } from "./theme-toggle";
+import {
+  type TrackColumn,
+  trackColumns,
+  trackColumnValue,
+} from "./track-columns";
 import { TrackDetails } from "./track-details";
 import "./styles.css";
 
 const sections = [
   { id: "home", icon: House },
   { id: "albums", icon: Disc3 },
-  { id: "songs", icon: Music2 },
+  { id: "tracks", icon: Music2 },
   { id: "artists", icon: Mic2 },
   { id: "genres", icon: Shapes },
   { id: "folders", icon: Folder },
@@ -322,7 +326,7 @@ function PlaylistDialog({
               <SortControl
                 field={field}
                 desc={direction}
-                fields={songSort}
+                fields={trackSort}
                 onChange={(s, d) => {
                   setField(s);
                   setDirection(d);
@@ -348,7 +352,7 @@ function PlaylistDialog({
     </Modal>
   );
 }
-const songSort = [
+const trackSort = [
   "addedAt",
   "title",
   "artist",
@@ -438,7 +442,7 @@ function BrowsePage() {
       detail={params.detail}
       preset={
         !params.detail &&
-        (section === "songs" ||
+        (section === "tracks" ||
           (section === "artists" && preset === "topArtists"))
           ? preset
           : undefined
@@ -475,15 +479,15 @@ function Browse({
   const previousPosition = browsePositions.get(positionKey);
   const runPlaylist = (fn: () => Promise<unknown>) => run(fn, "playlists");
   const [columnsOpen, setColumnsOpen] = useState(false);
-  const [extraColumns, setExtraColumns] = useState<SongColumn[]>(() => {
-    const stored = load<unknown>("songColumns", []);
-    return songColumns
+  const [extraColumns, setExtraColumns] = useState<TrackColumn[]>(() => {
+    const stored = load<unknown>("trackColumns", []);
+    return trackColumns
       .filter((column) => Array.isArray(stored) && stored.includes(column.id))
       .map((column) => column.id);
   });
-  const changeColumns = (columns: SongColumn[]) => {
+  const changeColumns = (columns: TrackColumn[]) => {
     setExtraColumns(columns);
-    save("songColumns", columns);
+    save("trackColumns", columns);
   };
   const splitMembers = (text: string) =>
     splitTagMembers(text, lib.tagSeparators || "");
@@ -507,7 +511,7 @@ function Browse({
     ...(preset
       ? {
           sort:
-            preset === "topSongs" || preset === "topArtists"
+            preset === "topTracks" || preset === "topArtists"
               ? "playCount"
               : "addedAt",
           desc: true,
@@ -538,7 +542,9 @@ function Browse({
   const [rule, setRule] = useState<Rule | undefined>(() =>
     previousPosition
       ? previousPosition.rule
-      : preset === "topSongs" || preset === "topArtists" || preset === "unheard"
+      : preset === "topTracks" ||
+          preset === "topArtists" ||
+          preset === "unheard"
         ? {
             mode: "all",
             rules: [
@@ -625,7 +631,7 @@ function Browse({
           : groupType === "artists"
             ? ["title", "count", "albumCount", "playCount"]
             : ["title", "count", "albumCount"]
-        : songSort;
+        : trackSort;
   const viewSort = sortFields.includes(view.sort) ? view.sort : sortFields[0];
   const pageQuery: BrowseQuery = {
     section,
@@ -672,7 +678,7 @@ function Browse({
     subtitle:
       groupType === "albums"
         ? group.artist
-        : `${group.count} ${t("songs")}${group.smart ? ` · ${t("smart")}` : ""}`,
+        : `${group.count} ${t("tracks")}${group.smart ? ` · ${t("smart")}` : ""}`,
   }));
   const pageFolders = data?.folders || [],
     pageTracks = tracks;
@@ -1033,7 +1039,7 @@ function Browse({
                 <Disc3 size={17} />
               </IconButton>
               <IconButton
-                label={t("songView")}
+                label={t("trackView")}
                 active={!detailAlbums}
                 onClick={() => {
                   setDetailAlbums(false);
@@ -1113,7 +1119,7 @@ function Browse({
           </button>
           {!view.grid && !groupMode && (
             <IconButton
-              label={t("songColumns")}
+              label={t("trackColumns")}
               active={extraColumns.length > 0}
               onClick={() => setColumnsOpen(true)}
             >
@@ -1186,7 +1192,7 @@ function Browse({
         {busy ? (
           <LibrarySkeleton
             label={t(busy ? "loadingLibrary" : "playlistRefreshing")}
-            variant={view.grid ? (groupMode ? "cards" : "song-grid") : "rows"}
+            variant={view.grid ? (groupMode ? "cards" : "track-grid") : "rows"}
             artists={groupMode && groupType === "artists"}
             folders={groupMode && groupType === "folders"}
           />
@@ -1287,7 +1293,7 @@ function Browse({
                   {groupType === "albums" && (
                     <small>
                       {group.year || t("unknownYear")} · {group.count}{" "}
-                      {t("songs")}
+                      {t("tracks")}
                     </small>
                   )}
                 </div>
@@ -1360,20 +1366,20 @@ function Browse({
             <div
               className={
                 view.grid
-                  ? "song-grid"
-                  : `song-list ${extraColumns.length ? "song-list-extra" : ""}`
+                  ? "track-grid"
+                  : `track-list ${extraColumns.length ? "track-list-extra" : ""}`
               }
               style={
                 !view.grid && extraColumns.length
                   ? ({
-                      "--song-columns": `30px minmax(200px, 2fr) minmax(160px, 1fr) 50px 54px repeat(${extraColumns.length}, minmax(160px, 1fr)) 84px`,
-                      "--song-list-width": `${720 + extraColumns.length * 174}px`,
+                      "--track-columns": `30px minmax(200px, 2fr) minmax(160px, 1fr) 50px 54px repeat(${extraColumns.length}, minmax(160px, 1fr)) 84px`,
+                      "--track-list-width": `${720 + extraColumns.length * 174}px`,
                     } as React.CSSProperties)
                   : undefined
               }
             >
               {!view.grid && (
-                <div className="song-table-header">
+                <div className="track-table-header">
                   <span>#</span>
                   <span>{t("title")}</span>
                   <span>
@@ -1383,7 +1389,7 @@ function Browse({
                   </span>
                   <span>{t("year")}</span>
                   <span>{t("duration")}</span>
-                  {songColumns
+                  {trackColumns
                     .filter((column) => extraColumns.includes(column.id))
                     .map((column) => (
                       <span key={column.id}>{t(column.label)}</span>
@@ -1393,7 +1399,7 @@ function Browse({
               )}
               {pageTracks.map((track, i) => (
                 <article
-                  className={`song-row ${track.missing ? "is-missing" : ""} ${playback.queue[playback.index]?.id === track.id ? "is-current" : ""}`}
+                  className={`track-row ${track.missing ? "is-missing" : ""} ${playback.queue[playback.index]?.id === track.id ? "is-current" : ""}`}
                   key={track.id}
                 >
                   {!view.grid && (
@@ -1414,10 +1420,10 @@ function Browse({
                       />
                     </label>
                   )}
-                  <div className="song-main">
+                  <div className="track-main">
                     <button
                       type="button"
-                      className="song-art"
+                      className="track-art"
                       aria-label={`${t("play")} ${track.title || track.filename}`}
                       onClick={() =>
                         playQuery(
@@ -1442,7 +1448,7 @@ function Browse({
                     <div>
                       <button
                         type="button"
-                        className="song-title"
+                        className="track-title"
                         onClick={() =>
                           playQuery(
                             { ...pageQuery, start: track.id },
@@ -1473,36 +1479,36 @@ function Browse({
                     </div>
                   </div>
                   {isAlbumDetail ? (
-                    <span className="song-album song-track-number">
+                    <span className="track-album track-track-number">
                       # {track.number || "—"}
                       {showDiscNumber && ` · CD ${track.disc || 1}`}
                     </span>
                   ) : (
                     <Link
                       {...link("albums", track.albumId)}
-                      className="song-album"
+                      className="track-album"
                     >
                       {track.album || t("unknownAlbum")}
                     </Link>
                   )}
-                  <span className="song-year">{track.year || "—"}</span>
-                  <span className="song-duration">
+                  <span className="track-year">{track.year || "—"}</span>
+                  <span className="track-duration">
                     {duration(track.duration)}
                   </span>
                   {!view.grid &&
                     extraColumns.map((id) => {
-                      const value = songColumnValue(track, id, prefs.language);
+                      const value = trackColumnValue(track, id, prefs.language);
                       return (
                         <span
                           key={id}
-                          className="song-extra-value"
+                          className="track-extra-value"
                           title={value}
                         >
                           {value}
                         </span>
                       );
                     })}
-                  <div className="song-actions">
+                  <div className="track-actions">
                     <FavoriteButton
                       label={t("favorite")}
                       active={track.favorite}
@@ -1621,17 +1627,17 @@ function Browse({
       </DialogPresence>
       <DialogPresence>
         {columnsOpen && (
-          <Modal title={t("songColumns")} close={() => setColumnsOpen(false)}>
-            <p className="help">{t("songColumnsHint")}</p>
-            <div className="song-column-options">
-              {songColumns.map((column) => (
+          <Modal title={t("trackColumns")} close={() => setColumnsOpen(false)}>
+            <p className="help">{t("trackColumnsHint")}</p>
+            <div className="track-column-options">
+              {trackColumns.map((column) => (
                 <label className="check" key={column.id}>
                   <input
                     type="checkbox"
                     checked={extraColumns.includes(column.id)}
                     onChange={(event) =>
                       changeColumns(
-                        songColumns
+                        trackColumns
                           .filter((item) =>
                             item.id === column.id
                               ? event.target.checked
@@ -1680,7 +1686,7 @@ const sectionRoute = createRoute({
   validateSearch: (search: Record<string, unknown>): { preset?: string } => ({
     preset:
       typeof search.preset === "string" &&
-      ["recentlyAdded", "topSongs", "unheard", "topArtists"].includes(
+      ["recentlyAdded", "topTracks", "unheard", "topArtists"].includes(
         search.preset,
       )
         ? search.preset

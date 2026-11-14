@@ -34,15 +34,15 @@ export function LibrarySkeleton({
   folders = false,
 }: {
   label: string;
-  variant?: "home" | "cards" | "rows" | "song-grid";
+  variant?: "home" | "cards" | "rows" | "track-grid";
   artists?: boolean;
   folders?: boolean;
 }) {
   const cards = (home = false) => (
     <div
       className={
-        variant === "song-grid"
-          ? "song-grid"
+        variant === "track-grid"
+          ? "track-grid"
           : `album-grid ${home ? "home-artist-grid" : folders ? "folder-grid" : artists ? "artist-grid" : ""}`
       }
     >
@@ -58,9 +58,9 @@ export function LibrarySkeleton({
     </div>
   );
   const rows = (home = false) => (
-    <div className={home ? "home-songs" : "skeleton-rows"}>
+    <div className={home ? "home-tracks" : "skeleton-rows"}>
       {placeholders.map((id) => (
-        <div className={home ? "home-song" : "skeleton-row"} key={id}>
+        <div className={home ? "home-track" : "skeleton-row"} key={id}>
           <div
             className={`skeleton-shape ${home ? "home-cover" : "skeleton-row-cover"} ${artists ? "skeleton-round" : ""}`}
           />
@@ -84,7 +84,7 @@ export function LibrarySkeleton({
                 {section === "artists" ? cards(true) : rows(true)}
               </div>
             ))
-          : variant === "cards" || variant === "song-grid"
+          : variant === "cards" || variant === "track-grid"
             ? cards()
             : rows()}
       </div>

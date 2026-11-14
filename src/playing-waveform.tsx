@@ -20,7 +20,7 @@ export function PlayingArtworkStatus({
 }) {
   return (
     <span
-      className="queue-artwork-status song-playing-status"
+      className="queue-artwork-status track-playing-status"
       role="img"
       aria-label={label}
       title={label}

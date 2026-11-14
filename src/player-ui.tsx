@@ -424,7 +424,7 @@ export function PlayerBar() {
             <>
               <div className="panel-toolbar">
                 <span>
-                  {s.queue.length} {t("songs")}
+                  {s.queue.length} {t("tracks")}
                 </span>
                 <button type="button" onClick={() => player.clear()}>
                   {t("clear")}
