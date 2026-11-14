@@ -4,6 +4,7 @@ import {
   defaults,
   lyricsLines,
   matches,
+  mediaURL,
   replayGain,
   sortTracks,
   splitMembers,
@@ -206,4 +207,42 @@ it("matches unified tag arrays with any-positive and none-negative semantics", (
   expect(matches(item, { field: "tag:blank", op: "isEmpty" })).toBe(true);
   expect(matches(item, { field: "bpm", op: "eq", value: 128 })).toBe(true);
   expect(matches(item, { field: "key", op: "eq", value: "F#m" })).toBe(true);
+});
+
+it("uses supplied content URLs without per-track artwork requests", () => {
+  const artwork = { url: "/api/artwork/shared", revision: "shared" };
+  const first = makeTrack({
+    id: "one",
+    albumId: "album",
+    artwork,
+    revision: "audio-v1",
+  });
+  const second = makeTrack({
+    ...first,
+    id: "two",
+    albumId: "other",
+    revision: "audio-v2",
+  });
+  expect(mediaURL(first, "cover")).toBe(
+    mediaURL(second, "cover", { ruleSet: "mobile" }),
+  );
+  expect(mediaURL(first, "cover")).toContain("/api/artwork/shared?");
+  expect(mediaURL(first, "cover")).not.toContain("ruleSet");
+  expect(
+    mediaURL(
+      {
+        ...first,
+        artwork: { url: "/api/artwork/changed", revision: "changed" },
+      },
+      "cover",
+    ),
+  ).not.toBe(mediaURL(first, "cover"));
+  expect(mediaURL({ ...first, artwork: null }, "cover")).toBe("");
+  expect(
+    mediaURL(
+      { ...first, artwork: undefined, hasCover: true, artworkRevision: "old" },
+      "cover",
+    ),
+  ).toBe("");
+  expect(mediaURL(first)).toContain("/tracks/one/stream?");
 });

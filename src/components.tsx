@@ -21,7 +21,7 @@ import { type ComponentProps, type ReactNode, useRef, useState } from "react";
 import { useApp } from "./context";
 import { useDialogPresence } from "./dialog-presence";
 import type { TextKey } from "./i18n";
-import { mediaURL, type Rule, type Track } from "./model";
+import { type Artwork, artworkURL, type Rule, type Track } from "./model";
 import { Select, SelectOption } from "./select";
 
 export function IconButton({
@@ -87,13 +87,15 @@ export function FavoriteButton({
 }
 export function Cover({
   track,
+  artwork,
   className = "",
 }: {
   track?: Track;
+  artwork?: Artwork | null;
   className?: string;
 }) {
   const [failed, setFailed] = useState("");
-  const url = track && track.hasCover !== false ? mediaURL(track, "cover") : "";
+  const url = artworkURL(artwork === undefined ? track?.artwork : artwork);
   return (
     <div
       className={`cover ${className}`}
@@ -139,7 +141,7 @@ export function GenreCover({ tracks }: { tracks: Track[] }) {
   const albums = new Set<string>();
   const covers: Track[] = [];
   for (const track of tracks) {
-    if (!track.hasCover || albums.has(track.albumId)) continue;
+    if (!track.artwork || albums.has(track.albumId)) continue;
     albums.add(track.albumId);
     covers.push(track);
     if (covers.length === 4) break;

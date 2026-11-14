@@ -70,6 +70,7 @@ services:
       HARMONIA_TOKEN: "${HARMONIA_TOKEN:-}"
     volumes:
       - data:/data
+      - cache:/cache
       - type: bind
         source: ${MUSIC_PATH:?Set MUSIC_PATH in .env}
         target: /music
@@ -85,6 +86,7 @@ services:
 
 volumes:
   data:
+  cache:
 ```
 
 Create a `.env` file beside it:
@@ -95,7 +97,7 @@ HARMONIA_HOST=localhost
 HARMONIA_TOKEN=
 ```
 
-Use an existing absolute music directory. On Windows with Docker Desktop, use a path such as `MUSIC_PATH=D:/Music`. The server runs as UID/GID 10001 and needs read access to the mounted music. The named `data` volume holds library metadata, artwork and cache.
+Use an existing absolute music directory. On Windows with Docker Desktop, use a path such as `MUSIC_PATH=D:/Music`. The server runs as UID/GID 10001 and needs read access to the mounted music. The named `data` volume holds persistent library metadata and playback settings; the separate `cache` volume holds artwork, transcoding and waveform caches.
 
 For access from another computer, replace `localhost` with the Docker host's LAN IP or hostname, such as `HARMONIA_HOST=192.168.1.20`. This value has no scheme or port. If authentication is desired, set a shared token and enter the same token in the player.
 
@@ -202,3 +204,5 @@ Play all resolves the selection through `/api/queue/query`, capped at **500 trac
 AirPlay keeps its own persistent repeat and shuffle modes; selecting server output reads them without copying local modes, and returning to local restores local modes. Server settings include a separate playback failure policy (Stop by default, or Skip for source/decode failures). Skip stops after all candidates fail; receiver/transport errors always stop. Clients no longer send conversion rules in AirPlay playback commands.
 
 Opening or refreshing the playback device picker reads the current receiver list from the server. When the server is unreachable, the picker shows only local playback and an active remote player switches to local output, paused.
+
+Track, album and artist artwork comes directly from their API `artwork` fields. Content-addressed `/api/artwork/:revision` URLs share browser cache entries across every reference to the same image. Clients do not request cover metadata per item or derive image URLs from track/album IDs.

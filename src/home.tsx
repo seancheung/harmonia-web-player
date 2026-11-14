@@ -160,7 +160,10 @@ export function HomePage() {
                         to="/$section/$detail"
                         params={{ section: "artists", detail: artist.name }}
                       >
-                        <Cover track={artist.tracks[0]} />
+                        <Cover
+                          track={artist.tracks[0]}
+                          artwork={artist.artwork ?? null}
+                        />
                       </Link>
                       <div className="group-copy">
                         <Link

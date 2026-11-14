@@ -1,4 +1,10 @@
-import { api, type Playlist, type Rule, type Track } from "./model";
+import {
+  type Artwork,
+  api,
+  type Playlist,
+  type Rule,
+  type Track,
+} from "./model";
 import { player } from "./player";
 export interface BrowseQuery {
   section: string;
@@ -16,6 +22,7 @@ export interface BrowseQuery {
   start?: string;
 }
 export interface BrowseGroup {
+  artwork?: Artwork | null;
   id: string;
   name: string;
   artist: string;
@@ -30,6 +37,7 @@ export interface BrowseGroup {
   tracks: Track[];
 }
 export interface BrowsePage {
+  artwork?: Artwork | null;
   items: Track[];
   groups: BrowseGroup[];
   folders: string[];

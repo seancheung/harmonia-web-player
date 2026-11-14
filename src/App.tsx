@@ -859,7 +859,10 @@ function Browse({
             className={`page-heading ${detail && section === "albums" ? "album-heading" : ""}`}
           >
             {detail && section === "albums" && (
-              <Cover track={data?.cover || tracks[0]} />
+              <Cover
+                track={data?.cover || tracks[0]}
+                artwork={data?.artwork ?? null}
+              />
             )}
             <div>
               <h1>{heading}</h1>
@@ -1259,6 +1262,7 @@ function Browse({
                     <GenreCover tracks={group.tracks} />
                   ) : (
                     <Cover
+                      artwork={group.artwork ?? null}
                       track={
                         group.tracks.find((track) => track.hasCover) ||
                         group.tracks[0]

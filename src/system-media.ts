@@ -74,7 +74,7 @@ export class SystemMedia {
         this.signature = "";
         return;
       }
-      const artwork = track.hasCover === false ? "" : mediaURL(track, "cover");
+      const artwork = mediaURL(track, "cover");
       const signature = JSON.stringify([
         track.id,
         track.title,

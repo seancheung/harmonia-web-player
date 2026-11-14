@@ -7,7 +7,13 @@ export interface Source {
   ignore: string[];
   error: string;
 }
+export interface Artwork {
+  url: string;
+  revision: string;
+}
 export interface Track {
+  artwork?: Artwork | null;
+  albumArtwork?: Artwork | null;
   modifiedAt?: number;
   createdAt?: number;
   id: string;
@@ -177,16 +183,24 @@ export function formatBytes(bytes: number): string {
   return `${Number(value.toFixed(index === 0 ? 0 : 2))} ${units[index]}`;
 }
 
+export function artworkURL(artwork?: Artwork | null) {
+  if (!artwork?.url.startsWith("/api/artwork/")) return "";
+  const p = load("preferences", defaults);
+  const query = new URLSearchParams({ token: p.token });
+  return `${p.api}${artwork.url}?${query}`;
+}
 export function mediaURL(
   t: Track,
   type = "stream",
   extra: Record<string, string> = {},
 ) {
   const p = load("preferences", defaults);
+  if (type === "cover") return artworkURL(t.artwork);
+
   const q = new URLSearchParams({
     token: p.token,
     ruleSet: p.ruleSet,
-    v: type === "cover" ? t.artworkRevision || t.revision : t.revision,
+    v: t.revision,
     ...extra,
   });
   return `${p.api}/api/tracks/${t.id}/${type}?${q}`;
