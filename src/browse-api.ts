@@ -26,6 +26,7 @@ export interface BrowseGroup {
   id: string;
   name: string;
   artist: string;
+  artists?: { id: string; name: string }[];
   year: number;
   count: number;
   albumCount: number;
@@ -46,7 +47,9 @@ export interface BrowsePage {
   libraryCount: number;
   heading: string;
   artist: string;
+  artists?: { id: string; name: string }[];
   year: number;
+  genres?: { id: string; name: string }[];
   cover?: Track;
   discs: number[];
   playlist?: Playlist;

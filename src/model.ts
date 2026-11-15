@@ -23,6 +23,7 @@ export interface Track {
   folder: string;
   title: string;
   artist: string;
+  artists?: { id: string; name: string }[];
   album: string;
   albumArtist: string;
   albumId: string;

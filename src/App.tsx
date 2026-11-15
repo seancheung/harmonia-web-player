@@ -75,7 +75,6 @@ import {
   type Playlist,
   type Rule,
   save,
-  splitMembers as splitTagMembers,
   type Track,
 } from "./model";
 import { usePage } from "./page-cache";
@@ -443,6 +442,7 @@ function BrowsePage() {
       preset={
         !params.detail &&
         (section === "tracks" ||
+          (section === "albums" && preset === "recentlyAdded") ||
           (section === "artists" && preset === "topArtists"))
           ? preset
           : undefined
@@ -489,8 +489,6 @@ function Browse({
     setExtraColumns(columns);
     save("trackColumns", columns);
   };
-  const splitMembers = (text: string) =>
-    splitTagMembers(text, lib.tagSeparators || "");
   const albumDetail = section === "albums" && !!detail;
   const viewPreferenceKey = albumDetail
     ? "view.albums.detail"
@@ -655,7 +653,11 @@ function Browse({
   const playlist = data?.playlist || lib.playlists.find((p) => p.id === detail);
   const manual = section === "playlists" && !!detail && !playlist?.smart;
   const tracks = data?.items || [];
-  const heading = data?.heading || t(section as TextKey) || section;
+  const heading =
+    (section === "genres" || section === "artists") &&
+    data?.heading === "__unknown__"
+      ? t(section === "artists" ? "unknownArtist" : "unknownGenre")
+      : data?.heading || t(section as TextKey) || section;
   const subheading = data?.artist
     ? `${data.artist} · ${data.year || t("unknownYear")}`
     : "";
@@ -696,7 +698,10 @@ function Browse({
     id
       ? {
           to: "/$section/$detail" as const,
-          params: { section: sec, detail: id },
+          params: {
+            section: sec,
+            detail: id,
+          },
         }
       : { to: "/$section" as const, params: { section: sec } };
   async function favorite(track: Track) {
@@ -866,7 +871,36 @@ function Browse({
             )}
             <div>
               <h1>{heading}</h1>
-              {!busy && subheading && <p>{subheading}</p>}
+              {!busy && subheading && (
+                <p>
+                  {isAlbumDetail ? (
+                    <>
+                      {(data?.artists || []).map((artist, index) => (
+                        <React.Fragment key={artist.id}>
+                          {index > 0 && " / "}
+                          <Link {...link("artists", artist.id)}>
+                            {artist.name}
+                          </Link>
+                        </React.Fragment>
+                      ))}
+                      {" · "}
+                      {data?.year || t("unknownYear")}
+                    </>
+                  ) : (
+                    subheading
+                  )}
+                </p>
+              )}
+              {!busy && isAlbumDetail && !!data?.genres?.length && (
+                <p>
+                  {data.genres.map((genre, index) => (
+                    <React.Fragment key={genre.id}>
+                      {index > 0 && " / "}
+                      <Link {...link("genres", genre.id)}>{genre.name}</Link>
+                    </React.Fragment>
+                  ))}
+                </p>
+              )}
             </div>
             <div className="heading-actions">
               {section === "playlists" && !detail ? (
@@ -1276,19 +1310,17 @@ function Browse({
                   </Link>
                   <p>
                     {groupType === "albums"
-                      ? (splitMembers(group.artist || "").length
-                          ? splitMembers(group.artist || "")
-                          : ["__unknown__"]
+                      ? (group.artists?.length
+                          ? group.artists
+                          : [{ id: "__unknown__", name: t("unknownArtist") }]
                         ).map((artist, index) => (
-                          <React.Fragment key={artist}>
+                          <React.Fragment key={artist.id}>
                             {index > 0 && "; "}
                             <Link
-                              {...link("artists", artist)}
+                              {...link("artists", artist.id)}
                               className="album-artist-link"
                             >
-                              {artist === "__unknown__"
-                                ? t("unknownArtist")
-                                : artist}
+                              {artist.name}
                             </Link>
                           </React.Fragment>
                         ))
@@ -1469,12 +1501,12 @@ function Browse({
                         )}
                       </button>
                       <div className="artist-links">
-                        {splitMembers(track.artist).length
-                          ? splitMembers(track.artist).map((artist, i) => (
-                              <React.Fragment key={artist}>
+                        {track.artists?.length
+                          ? track.artists.map((artist, i) => (
+                              <React.Fragment key={artist.id}>
                                 {i > 0 && ", "}
-                                <Link {...link("artists", artist)}>
-                                  {artist}
+                                <Link {...link("artists", artist.id)}>
+                                  {artist.name}
                                 </Link>
                               </React.Fragment>
                             ))

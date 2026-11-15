@@ -9,7 +9,8 @@ let epoch = 0;
 const scrollPositions = new Map<string, number>();
 function identity(path: string) {
   const p = load("preferences", defaults);
-  return JSON.stringify([p.api, p.token, path]);
+  // Version the payload schema so cached artist or genre names cannot become ID links.
+  return JSON.stringify([p.api, p.token, path, 3]);
 }
 async function diskKey(key: string) {
   if (globalThis.crypto?.subtle) {

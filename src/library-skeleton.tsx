@@ -3,11 +3,12 @@ const placeholders = Array.from(
   (_, index) => `placeholder-${index}`,
 );
 
-function Lines() {
+function Lines({ extra = false }: { extra?: boolean }) {
   return (
     <div className="skeleton-copy">
       <span className="skeleton-shape skeleton-line" />
       <span className="skeleton-shape skeleton-line skeleton-line-short" />
+      {extra && <span className="skeleton-shape skeleton-line" />}
     </div>
   );
 }
@@ -34,7 +35,7 @@ export function LibrarySkeleton({
   folders = false,
 }: {
   label: string;
-  variant?: "home" | "cards" | "rows" | "track-grid";
+  variant?: "home" | "home-albums" | "cards" | "rows" | "track-grid";
   artists?: boolean;
   folders?: boolean;
 }) {
@@ -57,14 +58,14 @@ export function LibrarySkeleton({
       ))}
     </div>
   );
-  const rows = (home = false) => (
+  const rows = (home = false, count = 8, extra = false) => (
     <div className={home ? "home-tracks" : "skeleton-rows"}>
-      {placeholders.map((id) => (
+      {placeholders.slice(0, count).map((id) => (
         <div className={home ? "home-track" : "skeleton-row"} key={id}>
           <div
             className={`skeleton-shape ${home ? "home-cover" : "skeleton-row-cover"} ${artists ? "skeleton-round" : ""}`}
           />
-          <Lines />
+          <Lines extra={extra} />
           {!home && <span className="skeleton-shape skeleton-row-meta" />}
         </div>
       ))}
@@ -81,12 +82,18 @@ export function LibrarySkeleton({
                   <span className="skeleton-shape skeleton-section-title" />
                   <span className="skeleton-shape skeleton-section-action" />
                 </div>
-                {section === "artists" ? cards(true) : rows(true)}
+                {section === "artists"
+                  ? cards(true)
+                  : section === "recent"
+                    ? rows(true, 8, true)
+                    : rows(true)}
               </div>
             ))
           : variant === "cards" || variant === "track-grid"
             ? cards()
-            : rows()}
+            : variant === "home-albums"
+              ? rows(true, 8, true)
+              : rows()}
       </div>
     </div>
   );

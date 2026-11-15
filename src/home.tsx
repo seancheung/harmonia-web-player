@@ -1,19 +1,24 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, Play } from "lucide-react";
 import { useSyncExternalStore } from "react";
-import { type HomePageData, playBrowse } from "./browse-api";
+import {
+  type BrowsePage,
+  browsePath,
+  type HomePageData,
+  playBrowse,
+} from "./browse-api";
 import { Cover, IconButton } from "./components";
 import { useApp } from "./context";
 import type { TextKey } from "./i18n";
 import { LibrarySkeleton } from "./library-skeleton";
-import { splitMembers as splitTagMembers, type Track } from "./model";
+import type { Track } from "./model";
 import { usePage } from "./page-cache";
 import { player } from "./player";
 import { PlayingArtworkStatus } from "./playing-waveform";
 import { ThemeToggle } from "./theme-toggle";
 
 export function HomePage() {
-  const { lib, t, notice } = useApp();
+  const { t, notice } = useApp();
   const playback = useSyncExternalStore(player.subscribe, player.snapshot);
   const {
     data,
@@ -21,10 +26,15 @@ export function HomePage() {
     error,
     refresh: reload,
   } = usePage<HomePageData>("/home");
-  const splitMembers = (text: string) =>
-    splitTagMembers(text, lib.tagSeparators || "");
-  const recent = data?.recent || [],
-    frequent = data?.frequent || [],
+  const recentAlbums = usePage<BrowsePage>(
+    browsePath({
+      section: "albums",
+      sort: "addedAt",
+      desc: true,
+      pageSize: 8,
+    }),
+  );
+  const frequent = data?.frequent || [],
     unheard = data?.unheard || [],
     topArtists = data?.artists || [];
   const trackSection = (title: TextKey, tracks: Track[]) => (
@@ -68,12 +78,12 @@ export function HomePage() {
                   {track.title || track.filename}
                 </button>
                 <div className="home-artists">
-                  {splitMembers(track.artist).map((name, i) => (
-                    <span key={name}>
+                  {(track.artists || []).map(({ id, name }, i) => (
+                    <span key={id}>
                       {i > 0 && " / "}
                       <Link
                         to="/$section/$detail"
-                        params={{ section: "artists", detail: name }}
+                        params={{ section: "artists", detail: id }}
                       >
                         {name}
                       </Link>
@@ -135,7 +145,95 @@ export function HomePage() {
           </div>
         ) : (
           <>
-            {trackSection("recentlyAdded", recent)}
+            <section className="home-section" aria-label={t("recentlyAdded")}>
+              <div className="home-section-heading">
+                <h2>{t("recentlyAdded")}</h2>
+                <Link
+                  to="/$section"
+                  params={{ section: "albums" }}
+                  search={{ preset: "recentlyAdded" }}
+                >
+                  {t("viewAll")}
+                </Link>
+              </div>
+              {recentAlbums.loading ? (
+                <LibrarySkeleton
+                  variant="home-albums"
+                  label={t("loadingLibrary")}
+                />
+              ) : recentAlbums.error && !recentAlbums.data ? (
+                <div role="alert">
+                  <p>
+                    {t(recentAlbums.error as TextKey) || recentAlbums.error}
+                  </p>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => void recentAlbums.refresh()}
+                  >
+                    {t("retry")}
+                  </button>
+                </div>
+              ) : (
+                <div className="home-tracks">
+                  {recentAlbums.data?.groups.map((album) => (
+                    <article className="home-track" key={album.id}>
+                      <button
+                        className="track-art home-cover"
+                        type="button"
+                        aria-label={`${t("play")} ${album.name || t("unknownAlbum")}`}
+                        onClick={() =>
+                          void playBrowse(
+                            {
+                              section: "albums",
+                              detail: album.id,
+                              sort: "number",
+                            },
+                            "album",
+                          ).catch((e) => notice(e.message))
+                        }
+                      >
+                        <Cover
+                          track={album.tracks[0]}
+                          artwork={album.artwork ?? null}
+                        />
+                        <Play
+                          size={20}
+                          fill="currentColor"
+                          aria-hidden="true"
+                        />
+                      </button>
+                      <div className="home-track-copy">
+                        <Link
+                          className="home-title"
+                          to="/$section/$detail"
+                          params={{ section: "albums", detail: album.id }}
+                        >
+                          <strong>{album.name || t("unknownAlbum")}</strong>
+                        </Link>
+                        <div className="home-artists">
+                          {(album.artists || []).map(({ id, name }, index) => (
+                            <span key={id}>
+                              {index > 0 && " / "}
+                              <Link
+                                to="/$section/$detail"
+                                params={{ section: "artists", detail: id }}
+                              >
+                                {name}
+                              </Link>
+                            </span>
+                          ))}
+                        </div>
+                        <span>
+                          {album.year || t("unknownYear")} · {album.count}{" "}
+                          {t("tracks")}
+                        </span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
             {trackSection("topTracks", frequent)}
             <section className="home-section" aria-label={t("topArtists")}>
               <div className="home-section-heading">
@@ -153,12 +251,12 @@ export function HomePage() {
                   {topArtists.map((artist) => (
                     <article
                       className="group-card artist-card home-artist"
-                      key={artist.name}
+                      key={artist.id}
                     >
                       <Link
                         className="group-cover"
                         to="/$section/$detail"
-                        params={{ section: "artists", detail: artist.name }}
+                        params={{ section: "artists", detail: artist.id }}
                       >
                         <Cover
                           track={artist.tracks[0]}
@@ -168,7 +266,7 @@ export function HomePage() {
                       <div className="group-copy">
                         <Link
                           to="/$section/$detail"
-                          params={{ section: "artists", detail: artist.name }}
+                          params={{ section: "artists", detail: artist.id }}
                         >
                           <strong>{artist.name}</strong>
                         </Link>

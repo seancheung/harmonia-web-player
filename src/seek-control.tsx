@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useId, useState } from "react";
 import { useApp } from "./context";
 import { duration, mediaURL, type Track } from "./model";
 import { player } from "./player";
+import { decodeWaveform } from "./waveform";
 
 export function SeekControl({
   track,
@@ -20,20 +21,8 @@ export function SeekControl({
     void fetch(url, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("waveform unavailable");
-        const data = await response.json();
-        if (
-          !Array.isArray(data.peaks) ||
-          data.peaks.length !== 512 ||
-          !data.peaks.every(
-            (v: unknown) =>
-              typeof v === "number" &&
-              Number.isFinite(v) &&
-              v >= 0 &&
-              v <= 1000,
-          )
-        )
-          return;
-        if (!controller.signal.aborted) setWaveform({ url, peaks: data.peaks });
+        const peaks = decodeWaveform(await response.arrayBuffer());
+        if (!controller.signal.aborted) setWaveform({ url, peaks });
       })
       .catch(() => {
         /* Keep the standard seek control when unavailable. */
