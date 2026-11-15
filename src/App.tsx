@@ -500,10 +500,14 @@ function Browse({
         ? "number"
         : section === "folders"
           ? "filename"
-          : section === "albums" || section === "artists"
+          : section === "albums" ||
+              section === "artists" ||
+              (section === "genres" && !detail)
             ? "title"
             : "addedAt",
-      desc: !["albums", "artists", "folders"].includes(section),
+      desc:
+        !["albums", "artists", "folders"].includes(section) &&
+        !(section === "genres" && !detail),
       size: 50,
     }),
     ...(preset
