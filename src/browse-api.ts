@@ -32,6 +32,7 @@ export interface BrowseGroup {
   albumCount: number;
   playCount: number;
   addedAt: number;
+  lastAddedAt?: number;
   modifiedAt: number;
   createdAt: number;
   smart: boolean;
@@ -86,6 +87,6 @@ export async function playBrowse(
         0,
         tracks.findIndex((track) => track.id === query.start),
       );
-  if (shuffled && !player.state.shuffle) player.shuffle();
+  if (shuffled && !player.state.shuffle) await player.shuffle();
   player.replace(tracks, index, mode);
 }

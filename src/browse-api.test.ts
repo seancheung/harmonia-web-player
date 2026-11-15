@@ -111,3 +111,32 @@ it("resolves 500 tracks in bounded batches while preserving order and selection"
   ).toEqual([200, 200, 100]);
   expect(player.replace).toHaveBeenCalledWith(items, 499, "track");
 });
+
+it("waits for shuffle mode before starting a new queue", async () => {
+  let enableShuffle!: () => void;
+  vi.mocked(player.shuffle).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        enableShuffle = resolve;
+      }),
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ids: ["a"] })))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: "a" }] })),
+      ),
+  );
+  const playback = playBrowse(
+    { section: "albums", detail: "album" },
+    "album",
+    true,
+  );
+  await vi.waitFor(() => expect(player.shuffle).toHaveBeenCalledOnce());
+  expect(player.replace).not.toHaveBeenCalled();
+  enableShuffle();
+  await playback;
+  expect(player.replace).toHaveBeenCalledOnce();
+});

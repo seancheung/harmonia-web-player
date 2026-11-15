@@ -215,6 +215,17 @@ export const splitMembers = (text: string, extra = "") => [
       .filter(Boolean),
   ),
 ];
+export function formatMembers(
+  text: string,
+  extra = "",
+  references?: { name: string }[],
+) {
+  return (
+    references?.length
+      ? references.map((member) => member.name)
+      : splitMembers(text, extra)
+  ).join(" / ");
+}
 export function matches(t: Track, r: Rule): boolean {
   if (r.mode) {
     return r.mode === "all"

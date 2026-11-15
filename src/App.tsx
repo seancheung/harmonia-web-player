@@ -71,6 +71,7 @@ import { LibrarySkeleton, SkeletonHeading } from "./library-skeleton";
 import {
   api,
   duration,
+  formatMembers,
   load,
   type Playlist,
   type Rule,
@@ -498,16 +499,17 @@ function Browse({
       grid: ["albums", "artists"].includes(section),
       sort: albumDetail
         ? "number"
-        : section === "folders"
-          ? "filename"
-          : section === "albums" ||
-              section === "artists" ||
-              (section === "genres" && !detail)
-            ? "title"
-            : "addedAt",
+        : section === "albums"
+          ? "lastAddedAt"
+          : section === "folders"
+            ? "filename"
+            : section === "artists" || (section === "genres" && !detail)
+              ? "title"
+              : "addedAt",
       desc:
-        !["albums", "artists", "folders"].includes(section) &&
-        !(section === "genres" && !detail),
+        (section === "albums" && !detail) ||
+        (!["albums", "artists", "folders"].includes(section) &&
+          !(section === "genres" && !detail)),
       size: 50,
     }),
     ...(preset
@@ -515,7 +517,9 @@ function Browse({
           sort:
             preset === "topTracks" || preset === "topArtists"
               ? "playCount"
-              : "addedAt",
+              : section === "albums" && preset === "recentlyAdded"
+                ? "lastAddedAt"
+                : "addedAt",
           desc: true,
         }
       : {}),
@@ -629,7 +633,7 @@ function Browse({
       ? ["filename", "modifiedAt", "createdAt"]
       : groupMode
         ? groupType === "albums"
-          ? ["title", "artist", "year", "addedAt", "count"]
+          ? ["title", "artist", "year", "addedAt", "lastAddedAt", "count"]
           : groupType === "artists"
             ? ["title", "count", "albumCount", "playCount"]
             : ["title", "count", "albumCount"]
@@ -661,9 +665,11 @@ function Browse({
     (section === "genres" || section === "artists") &&
     data?.heading === "__unknown__"
       ? t(section === "artists" ? "unknownArtist" : "unknownGenre")
-      : data?.heading || t(section as TextKey) || section;
+      : section === "albums" && !detail && preset === "recentlyAdded"
+        ? t("lastAddedAt")
+        : data?.heading || t(section as TextKey) || section;
   const subheading = data?.artist
-    ? `${data.artist} · ${data.year || t("unknownYear")}`
+    ? `${formatMembers(data.artist, lib.tagSeparators, data.artists)} · ${data.year || t("unknownYear")}`
     : "";
   const sourceID = section === "folders" ? (detail || "").split("|")[0] : "";
   const folder =
@@ -683,7 +689,7 @@ function Browse({
         : group.name,
     subtitle:
       groupType === "albums"
-        ? group.artist
+        ? formatMembers(group.artist, lib.tagSeparators, group.artists)
         : `${group.count} ${t("tracks")}${group.smart ? ` · ${t("smart")}` : ""}`,
   }));
   const pageFolders = data?.folders || [],
@@ -1319,7 +1325,7 @@ function Browse({
                           : [{ id: "__unknown__", name: t("unknownArtist") }]
                         ).map((artist, index) => (
                           <React.Fragment key={artist.id}>
-                            {index > 0 && "; "}
+                            {index > 0 && " / "}
                             <Link
                               {...link("artists", artist.id)}
                               className="album-artist-link"
@@ -1508,7 +1514,7 @@ function Browse({
                         {track.artists?.length
                           ? track.artists.map((artist, i) => (
                               <React.Fragment key={artist.id}>
-                                {i > 0 && ", "}
+                                {i > 0 && " / "}
                                 <Link {...link("artists", artist.id)}>
                                   {artist.name}
                                 </Link>
@@ -1537,7 +1543,12 @@ function Browse({
                   </span>
                   {!view.grid &&
                     extraColumns.map((id) => {
-                      const value = trackColumnValue(track, id, prefs.language);
+                      const value = trackColumnValue(
+                        track,
+                        id,
+                        prefs.language,
+                        lib.tagSeparators,
+                      );
                       return (
                         <span
                           key={id}

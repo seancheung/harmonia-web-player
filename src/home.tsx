@@ -29,7 +29,7 @@ export function HomePage() {
   const recentAlbums = usePage<BrowsePage>(
     browsePath({
       section: "albums",
-      sort: "addedAt",
+      sort: "lastAddedAt",
       desc: true,
       pageSize: 8,
     }),
@@ -145,9 +145,9 @@ export function HomePage() {
           </div>
         ) : (
           <>
-            <section className="home-section" aria-label={t("recentlyAdded")}>
+            <section className="home-section" aria-label={t("lastAddedAt")}>
               <div className="home-section-heading">
-                <h2>{t("recentlyAdded")}</h2>
+                <h2>{t("lastAddedAt")}</h2>
                 <Link
                   to="/$section"
                   params={{ section: "albums" }}

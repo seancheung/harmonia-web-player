@@ -2,7 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import { Cover, Modal } from "./components";
 import { useApp } from "./context";
 import type { TextKey } from "./i18n";
-import { duration, formatBytes, type Track } from "./model";
+import { duration, formatBytes, formatMembers, type Track } from "./model";
 
 export function TrackDetails({
   track,
@@ -41,16 +41,22 @@ export function TrackDetails({
         <Cover track={track} />
         <div>
           <h3>{track.title || track.filename}</h3>
-          <p>{track.artist || t("unknownArtist")}</p>
+          <p>
+            {formatMembers(track.artist, lib.tagSeparators, track.artists) ||
+              t("unknownArtist")}
+          </p>
         </div>
       </div>
       <section className="track-detail-section">
         <h4>{t("trackInformation")}</h4>
         {rows([
-          ["artist", track.artist],
+          [
+            "artist",
+            formatMembers(track.artist, lib.tagSeparators, track.artists),
+          ],
           ["album", track.album],
-          ["albumArtist", track.albumArtist],
-          ["genre", track.genre],
+          ["albumArtist", formatMembers(track.albumArtist, lib.tagSeparators)],
+          ["genre", formatMembers(track.genre, lib.tagSeparators)],
           ["year", track.year || "—"],
           ["disc", track.disc || "—"],
           ["number", track.number || "—"],

@@ -1,5 +1,5 @@
 import type { TextKey } from "./i18n";
-import { formatBytes, type Track } from "./model";
+import { formatBytes, formatMembers, type Track } from "./model";
 
 export const trackColumns = [
   { id: "albumArtist", label: "albumArtist" },
@@ -17,8 +17,12 @@ export function trackColumnValue(
   track: Track,
   column: TrackColumn,
   language: string,
+  separators = "",
 ) {
   switch (column) {
+    case "albumArtist":
+    case "genre":
+      return formatMembers(track[column], separators) || "—";
     case "addedAt":
     case "lastPlayed":
       return track[column]

@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, Check, Pause, X } from "lucide-react";
 import { memo, useEffect, useRef } from "react";
 import { Cover, IconButton } from "./components";
 import { useApp } from "./context";
-import type { Track } from "./model";
+import { formatMembers, type Track } from "./model";
 import { player } from "./player";
 import { PlayingWaveform } from "./playing-waveform";
 
@@ -20,7 +20,7 @@ export const QueueList = memo(function QueueList({
   playing: boolean;
   open: boolean;
 }) {
-  const { t } = useApp();
+  const { t, lib } = useApp();
   const played = new Set(playedIds);
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtual = useVirtualizer({
@@ -96,7 +96,11 @@ export const QueueList = memo(function QueueList({
                   <small>
                     {item.missing
                       ? t("missing")
-                      : item.artist || t("unknownArtist")}
+                      : formatMembers(
+                          item.artist,
+                          lib.tagSeparators,
+                          item.artists,
+                        ) || t("unknownArtist")}
                   </small>
                 </span>
               </button>

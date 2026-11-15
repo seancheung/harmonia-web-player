@@ -849,10 +849,10 @@ export class Player {
     } else void this.preload();
     this.persist();
   }
-  shuffle() {
+  async shuffle() {
     this.emit({ shuffle: !this.state.shuffle });
     if (this.state.remote)
-      void this.remote({ action: "shuffle", shuffle: this.state.shuffle });
+      await this.remote({ action: "shuffle", shuffle: this.state.shuffle });
     else {
       this.resetShuffle();
       void this.preload();

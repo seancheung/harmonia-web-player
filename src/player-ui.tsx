@@ -27,7 +27,7 @@ import { Cover, FavoriteButton, IconButton, Modal } from "./components";
 import { useApp } from "./context";
 import { DialogPresence } from "./dialog-presence";
 import type { TextKey } from "./i18n";
-import { api, duration, lyricsLines } from "./model";
+import { api, duration, formatMembers, lyricsLines } from "./model";
 import { isNetworkFailure, player } from "./player";
 import { QueueList } from "./queue-list";
 import { SeekControl } from "./seek-control";
@@ -35,7 +35,7 @@ import { VolumeControl } from "./volume-control";
 
 export function PlayerBar() {
   const s = useSyncExternalStore(player.subscribe, player.snapshot);
-  const { t, setFavorite, prefs, airplayAvailable } = useApp();
+  const { t, setFavorite, prefs, airplayAvailable, lib } = useApp();
   const [panel, setPanel] = useState<
     "queue" | "lyrics" | "output" | "sleep" | null
   >(null);
@@ -229,7 +229,15 @@ export function PlayerBar() {
             <strong>
               {track?.title || track?.filename || t("nothingPlaying")}
             </strong>
-            <p>{track?.artist || t("playerHint")}</p>
+            <p>
+              {(track &&
+                formatMembers(
+                  track.artist,
+                  lib.tagSeparators,
+                  track.artists,
+                )) ||
+                t("playerHint")}
+            </p>
           </div>
           {track && favoriteButton}
         </div>
